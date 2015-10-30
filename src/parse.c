@@ -104,7 +104,7 @@ dns_answer_get(dns_context *context)
     return NULL;
 }
 
-int parse_records(dns_context *context)
+void dns_debug_pp(dns_context *context)
 {
     dns_rrecord *record;
     char *ptr, *name;
