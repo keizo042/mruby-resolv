@@ -9,7 +9,6 @@
 #include "mruby/variable.h"
 #include "mruby/value.h"
 
-#include "resolver.h"
 
 typedef struct {
 }mrb_resolv_data;
