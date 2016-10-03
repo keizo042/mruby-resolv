@@ -11,7 +11,7 @@
 
 
 typedef struct {
-} mrb_resolv_data;
+} mrb_dns_data;
 
 static void mrb_dns_free(mrb_state *mrb, void *p) {}
 
