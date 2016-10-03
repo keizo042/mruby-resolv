@@ -1,8 +1,8 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "mruby.h"
+#include "mruby/array.h"
 #include "mruby/class.h"
 #include "mruby/data.h"
 #include "mruby/string.h"
@@ -50,38 +50,35 @@ static mrb_value mrb_dns_init(mrb_state *mrb, mrb_value self) {
 }
 
 static mrb_value mrb_dns_getaddress(mrb_state *mrb, mrb_value self) {
-    char *address       = NULL;
+    mrb_value address   = NULL;
     dns_context *query  = NULL;
     dns_context *result = NULL;
 
-    mrb_get_args(mrb, "z", address);
-    query = mrb_resolver_new();
-
-    mrb_resolver(query, result);
-
+    mrb_get_args(mrb, "o", &address);
 
     return mrb_nil_value();
 }
 
 static mrb_value mrb_dns_getname(mrb_state *mrb, mrb_value self) {
-    char *name = NULL;
+    mrb_value name;
 
-    mrb_get_args(mrb, "z", name);
+    mrb_get_args(mrb, "o", &name);
 
     return self;
 }
 
 static mrb_value mrb_dns_get_resource(mrb_state *mrb, mrb_value self) {
-    char *v = NULL;
+    mrb_value v;
     mrb_int rr;
-    mrb_get_args(mrb, "zi", v, &rr);
-    return self;
+    mrb_get_args(mrb, "oi", &v, &rr);
+    return mrb_nil_value();
 }
 
 static mrb_value mrb_dns_get_resources(mrb_state *mrb, mrb_value self) {
-    char *v = NULL;
+    mrb_value v;
     mrb_int rrecord;
-    mrb_get_args(mrb, "zi", v, &rrecord);
+
+    mrb_get_args(mrb, "oi", &v, &rrecord);
     return mrb_nil_value();
 }
 
@@ -93,7 +90,13 @@ void mrb_mruby_resolv_gem_init(mrb_state *mrb) {
     MRB_SET_INSTANCE_TT(dns, MRB_TT_DATA);
 
     mrb_define_method(mrb, resolv, "initialize", mrb_resolv_init, MRB_ARGS_ANY());
+
     mrb_define_method(mrb, dns, "initialize", mrb_dns_init, MRB_ARGS_ANY());
+
+    mrb_define_method(mrb, dns, "getaddress", mrb_dns_getaddress, MRB_ARGS_REQ(1));
+    mrb_define_method(mrb, dns, "getname", mrb_dns_getaddress, MRB_ARGS_REQ(1));
+    mrb_define_method(mrb, dns, "getresource", mrb_dns_get_resource, MRB_ARGS_REQ(2));
+    mrb_define_method(mrb, dns, "getresources", mrb_dns_get_resource, MRB_ARGS_REQ(2));
 }
 
 void mrb_mruby_resolv_gem_final(mrb_state *mrb) {}
