@@ -22,7 +22,7 @@ static const mrb_data_type mrb_dns_data_type = {
 static mrb_value mrb_resolv_init(mrb_state *mrb, mrb_value self) {
     char *cache_server            = NULL;
     const char *google_public_dns = "8.8.8.8";
-    struct RClass *resolv;
+    struct RClass *resolv = NULL;
 
     resolv = mrb_module_get(mrb, "Resolv");
 
