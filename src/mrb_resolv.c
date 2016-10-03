@@ -22,7 +22,7 @@ static const mrb_data_type mrb_dns_data_type = {
     "mrb_dns_data", mrb_dns_free,
 };
 
-static mrb_value mrb_dns_init(mrb_state *mrb, mrb_value self)
+static mrb_value mrb_resolv_init(mrb_state *mrb, mrb_value self)
 {
     char *cache_server = NULL;
     const char* google_public_dns = "8.8.8.8";
@@ -91,7 +91,7 @@ void mrb_mruby_resolv_gem_init(mrb_state *mrb)
     MRB_SET_INSTANCE_TT(dns, MRB_TT_DATA);
     MRB_SET_INSTANCE_TT(resolv, MRB_TT_DATA);
 
-    mrb_define_method(mrb,    resolv, "initialize",      mrb_dns_init,              MRB_ARGS_NONE() );
+    mrb_define_method(mrb,    resolv, "initialize",      mrb_resolv_init,              MRB_ARGS_NONE() );
     mrb_define_method(mrb,    resolv, "getaddress",      mrb_dns_getaddress,        MRB_ARGS_REQ(1) );
     mrb_define_method(mrb,    resolv, "getname",         mrb_dns_getname,         MRB_ARGS_REQ(1) );
     mrb_define_method(mrb,    resolv, "getnames",         mrb_dns_getname,         MRB_ARGS_REQ(1) );
