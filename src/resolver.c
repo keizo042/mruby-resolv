@@ -1,11 +1,13 @@
 #include "resolver.h"
 #include "mruby.h"
-#include "mruby/variable.h"
 #include "mruby/value.h"
+#include "mruby/variable.h"
 
 #if __linux__ == 1
-#include <sys/types.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #if defined(__GLIBC__) && defined(__GLIBC_MINOR__)
 #if (__GLIBC__ >= 2) && (__GLIBC_MINOR__ > 3)
@@ -22,7 +24,7 @@
 #endif
 
 #if __WIN32__ == 1
-#error  "not yet implement win32api support"
+#error "not yet implement win32api support"
 #endif
 
 #if __APPLE__ == 1
@@ -31,20 +33,13 @@
 
 int mrb_resolver_send(mrb_state *mrb, mrb_dns_state *dns, mrb_dns_t *request);
 
-mrb_dns_lex* mrb_resolver_lex(){
-    return NULL;
-}
-mrb_dns_state* mrb_resolver_new(){
-    return NULL;
-}
+mrb_dns_lex *mrb_resolver_lex() { return NULL; }
+mrb_dns_state *mrb_resolver_new(mrb_dns_option *) { return NULL; }
 
-int mrb_resolver_send(mrb_state *mrb, mrb_dns_state *dns, mrb_dns_t *request){
-    return -1;
-}
+int mrb_resolver_send(mrb_state *mrb, mrb_dns_state *dns, mrb_dns_t *request) { return -1; }
 
-int mrb_resolver_recv(mrb_state *mrb, mrb_dns_state *dns, nrb_dns_t *response){
-}
+int mrb_resolver_recv(mrb_state *mrb, mrb_dns_state *dns, nrb_dns_t *response) {}
 
-int mrb_resolver_getresources(mrb_state *mrb, mrb_dns_state *dns, mrb_value v, mrb_int typ){
+int mrb_resolver_getresources(mrb_state *mrb, mrb_dns_state *dns, mrb_value v, mrb_int typ) {
     return -1;
 }

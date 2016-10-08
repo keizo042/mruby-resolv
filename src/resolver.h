@@ -4,6 +4,12 @@
 #include <stdint.h>
 #include <string.h>
 
+#if __linux__ == 1
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
+#endif
+
 #define MRB_RESOLV_RESOLVER_VERSION "0.1.0"
 #define MRB_RESOLV_RESOLVER_VARSION_MAJOR 0
 #define MRB_RESOLV_RESOLVER_VARSION_MINOR_FIRST 1
@@ -55,9 +61,18 @@ typedef struct mrb_dns_lex_s {
     mrb_dns_t *data;
 } mrb_dns_lex;
 
-typedef struct mrb_dns_state_s { mrb_dns_header *header; } mrb_dns_state;
+typedef struct mrb_dns_state_s {
+    int sock;
+    struct sockaddr_in *sockaddr;
+    mrb_dns_header *header;
+} mrb_dns_state;
+
+typedef struct mrb_dns_option_s {
+    int tcp;
+    uint64_t nameserver;
+} mrb_dns_option;
 
 mrb_dns_lex *mrb_resolver_lex();
-mrb_dns_state *mrb_resolver_new();
+mrb_dns_state *mrb_resolver_new(mrb_dns_option *);
 int mrb_resolver_getresources(mrb_state *mrb, mrb_dns_state *, mrb_value, mrb_int);
 #endif
