@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "mruby.h"
 #include "mruby/array.h"
@@ -44,15 +45,13 @@ static mrb_value mrb_dns_init(mrb_state *mrb, mrb_value self) {
 
     mrb_value option;
 
-    if (mrb_get_args(mr, b "|o", &option) > 1) {
+    if (mrb_get_args(mrb, "|o", &option) > 1) {
     }
     return self;
 }
 
 static mrb_value mrb_dns_getaddress(mrb_state *mrb, mrb_value self) {
-    mrb_value address   = NULL;
-    dns_context *query  = NULL;
-    dns_context *result = NULL;
+    mrb_value address;
 
     mrb_get_args(mrb, "o", &address);
 
@@ -83,9 +82,13 @@ static mrb_value mrb_dns_get_resources(mrb_state *mrb, mrb_value self) {
 }
 
 void mrb_mruby_resolv_gem_init(mrb_state *mrb) {
-    struct RClass *resolv, *dns;
-    resolv = mrb_define_class(mrb, "Resolv", mrb->object_class);
-    dns    = mrb_define_class_under(mrb, resolv, "DNS", mrb->object_class);
+    struct RClass *resolv, *dns, *resource, *in;
+    struct RClass *a, *a4, *mx, *soa, *any, *txt, *ptr, *cname;
+    resolv   = mrb_define_class(mrb, "Resolv", mrb->object_class);
+    dns      = mrb_define_class_under(mrb, resolv, "DNS", mrb->object_class);
+    resource = mrb_define_class_under(mrb, dns, "Resource", mrb->object_class);
+    in       = mrb_define_module_under(mrb, resource, "IN");
+
     MRB_SET_INSTANCE_TT(resolv, MRB_TT_DATA);
     MRB_SET_INSTANCE_TT(dns, MRB_TT_DATA);
 
