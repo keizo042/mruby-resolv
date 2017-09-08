@@ -189,7 +189,6 @@ int mrb_dns_codec_get_str(mrb_state *mrb, mrb_dns_get_state *getter, uint64_t si
     strnpcy(dist, getter->buff + getter->pos, size);
     getter->pos += size;
 
-
     return 0;
 }
 

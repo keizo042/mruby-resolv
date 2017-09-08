@@ -1,4 +1,4 @@
-#ifdef MRB_DNS_CODEC_H
+#ifndef MRB_DNS_CODEC_H
 #define MRB_DNS_CODEC_H
 
 #include <stdint.h>

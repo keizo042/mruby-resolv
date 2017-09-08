@@ -21,7 +21,7 @@ typedef struct mrb_dns_header_s {
 typedef struct mrb_dns_name_s {
         char *name;
         char count;
-}mrb_dns_name_t
+}mrb_dns_name_t;
 
 typedef struct mrb_dns_question_s {
     mrb_dns_name_t *qname;
