@@ -8,19 +8,57 @@
  * Put
  **/
 
+// open put state.
 mrb_dns_put_state *mrb_dns_codec_put_open(mrb_state *mrb) {
     mrb_dns_put_state *putter = (mrb_dns_put_state *)mrb_malloc(mrb, sizeof(mrb_dns_put_state));
     putter->buff              = NULL;
-    putter->pos               = 0;
+    putter->size              = 0;
     return putter;
 }
 
-int mrb_dns_codec_put_uint8(mrb_state *mrb, mrb_dns_put_state *putter, uint8_t w) { return -1; }
+// put a octtet int bytes
+int mrb_dns_codec_put_uint8(mrb_state *mrb, mrb_dns_put_state *putter, uint8_t w) {
+    const int size = putter->size + 1;
+    char *b        = (char *)mrb_malloc(mrb, size);
 
-int mrb_dns_codec_put_uint16be(mrb_state *mrb, mrb_dns_put_state *putter, uint16_t w) { return -1; }
+    strncpy(b, putter->buff, putter->size);
+    b[size]     = w;
+    b[size + 1] = '\0';
+
+    mrb_free(mrb, putter->buff);
+    putter->buff = b;
+    putter->size = size;
+    return 0;
+}
+
+// put 2 octtets value as big endian into bytes
+int mrb_dns_codec_put_uint16be(mrb_state *mrb, mrb_dns_put_state *putter, uint16_t w) {
+    const int size = putter->size + 2;
+    char *b        = (char *)mrb_malloc(mrb, size);
+
+    strncpy(b, putter->buff, putter->size);
+    b[size]     = (w && 0xff);
+    b[size + 1] = (w && 0xff00) >> 8;
+    b[size + 2] = '\0';
+
+    mrb_free(mrb, putter->buff);
+    putter->buff = b;
+    putter->size = size;
+
+    return 0;
+}
 
 int mrb_dns_codec_put_str(mrb_state *mrb, mrb_dns_put_state *putter, char *buff, uint64_t len) {
-    return -1;
+    const int size = putter->size + len;
+    char *b        = (char *)mrb_malloc(mrb, size);
+
+    strncpy(b, putter->buff, putter->size);
+    b = strcat(b, buff);
+
+    mrb_free(mrb, putter->buff);
+    putter->buff = b;
+    putter->size = size;
+    return 0;
 }
 
 /**
@@ -29,15 +67,17 @@ int mrb_dns_codec_put_str(mrb_state *mrb, mrb_dns_put_state *putter, char *buff,
 
 
 int mrb_dns_codec_put_name(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_name_t *name) {
-    char node[256]; // domain node size is represent by  octet byte. limit 2^8.
+    char *tok = NULL;
 
-    for (int i = 0; i < name->size; i++) {
-        int len = strlen(node);
-        mrb_dns_codec_put_byte(mrb, putter, len);
-        mrb_dns_codec_put_str(mrb, putter, (char *)node, len);
+    for (strtok(name->name, "."); tok != NULL, tok = strtok(NULL, ".")) {
+        int len = strlen(tok);
+        if (mrb_dns_codec_put_uint8(mrb, putter, len))
+            return -1;
+        if (mrb_dns_codec_put_str(mrb, putter, tok, len))
+            return -1;
     }
 
-    return -1;
+    return 0;
 }
 
 int mrb_dns_codec_put_header(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_header_t *hdr) {
@@ -48,14 +88,16 @@ int mrb_dns_codec_put_header(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_
     mrb_dns_codec_put_uint16be(mrb, putter, hdr->qdcount);
     mrb_dns_codec_put_uint16be(mrb, putter, hdr->ancount);
     mrb_dns_codec_put_uint16be(mrb, putter, hdr->nscount);
-    return -1;
+    mrb_dns_codec_put_uitn16be(mrb, putter, hdr->arcount);
+    return 0;
 }
 
 int mrb_dns_codec_put_question(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_question_t *q) {
-    mrb_dns_codec_put_name(mrb, putter, q->qname);
-    mrb_dns_codec_put_uint16be(mrb, putter, q->qtype);
-    mrb_dns_codec_put_uint15be(mrb, putter, q->qklass);
-    return -1;
+    if (mrb_dns_codec_put_name(mrb, putter, q->qname))
+        return -1;
+    if (mrb_dns_codec_put_uint16be(mrb, putter, q->qtype))
+        return -1;
+    return 0;
 }
 
 int mrb_dns_codec_put_rdata(mrb_state *mrb, mrb_dns_put_state *codec, mrb_dns_rdata_t *rdata) {
@@ -65,7 +107,7 @@ int mrb_dns_codec_put_rdata(mrb_state *mrb, mrb_dns_put_state *codec, mrb_dns_rd
     mrb_dns_codec_put_uint16be(mrb, putter, rdata->ttl);
     mrb_dns_codec_put_uint16be(mrb, putter, rdata->rlength);
     mrb_dns_codec_put_str(mrb, putter, rdata->rdata, rdata->rlength);
-    return -1;
+    return 0;
 }
 
 int mrb_dns_codec_put(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_pkt_t *pkt) {
@@ -89,12 +131,17 @@ int mrb_dns_codec_put(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_pkt_t *
  *  Get
  **/
 
-mrb_dns_get_state* mrb_dns_codec_get_open(mrb_state *mrb, char *buff){
+mrb_dns_get_state *mrb_dns_codec_get_open(mrb_state *mrb, char *buff) {
     mrb_dns_get_state *state = (mrb_dns_get_state *)mrb_malloc(mrb, sizeof(mrb_dns_get_state));
-    char *b                  = (char *)mrb_malloc(mrb, strlen(buf) + 1);
-    state->buff              = b;
-    state->len               = -1;
-    getter                   = state;
+    uint64_t ssize           = strlen(buff);
+    uint64_t bsize           = ssize + 1;
+    char *b                  = (char *)mrb_malloc(mrb, bsize);
+    if (!b) return NULL;
+    strnpcy(b, buff, ssize);
+
+    state->buff = b;
+    state->len  = 0;
+    state->end  = ssize;
     return state;
 }
 
@@ -106,38 +153,44 @@ int mrb_dns_codec_get_close(mrb_state *mrb, mrb_dns_get_state *getter) {
 }
 
 int mrb_dns_codec_get_uint8(mrb_state *mrb, mrb_dns_get_state *getter, uint8_t *w1) {
-    if (w1 == NULL) {
+    // TODO: assertion
+    if (w1 == NULL)
         return -1;
-    }
     pos = getter->pos;
-    if (pos + 1 > getter->end) {
+    if (pos + 1 > getter->end)
         return -1;
-    }
-    w2 = getter->buff[pos + 1];
+    if (getter->buff[pos] == '\0')
+        return -1;
+
+    w2 = getter->buff[pos];
     getter->pos++;
 
     return 0;
 }
 
 int mrb_dns_codec_get_uint16be(mrb_state *mrb, mrb_dns_get_state *getter, uint16_t *w2) {
-    int pos;
-    if (w2 == NULL) {
+    if (w2 == NULL)
         return -1;
-    }
-    pos = getter->pos;
-    if (pos + 2 > getter->end) {
+    int pos = getter->pos;
+    if (pos + 2 > getter->end)
         return -1;
-    }
-    w2 = getter->buff[pos + 2] << 8 + getter->buff[pos + 1];
+    if (getter->buff[pos + 2] == '\0')
+        return -1;
+
+    w2 = getter->buff[pos + 1] << 8 + getter->buff[pos];
     getter->pos += 2;
     return 0;
 }
 
-int mrb_dns_codec_get_str(mrb_state *mrb, mrb_dns_get_state *getter, char *dist, uint64_t size) {
+int mrb_dns_codec_get_str(mrb_state *mrb, mrb_dns_get_state *getter, uint64_t size, char *dist) {
+    if (dist != NULL)
+        return -1;
     dist = (char *)malloc(size + 1);
     strnpcy(dist, getter->buff + getter->pos, size);
     getter->pos += size;
-    return -1;
+
+
+    return 0;
 }
 
 /**
@@ -147,18 +200,17 @@ int mrb_dns_codec_get_str(mrb_state *mrb, mrb_dns_get_state *getter, char *dist,
 
 int mrb_dns_codec_get_header(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_header_t *ret) {
     // TODO: assertion and validation
-    uint8_t w1 = 0, w2 = 0;
-    if (ret != NULL) {
+    if (ret != NULL)
         return -1;
-    }
+
+    uint8_t w1 = 0, w2 = 0;
     mrb_dns_header_t *hdr = (mrb_dns_header_t *)malloc(sizeof(mrb_dns_header_t));
     mrb_dns_codec_get_uint16be(mrb_state * mrb, mrb_dns_get_state * getter, &hdr->id);
 
-    //  w1 is a octet as (QR | OPCODE | AA | TC |RD)
+    // a octet as (QR | OPCODE | AA | TC |RD)
     mrb_dns_codec_get_uint8(mrb, getter, &w1);
-    if (w1 && 0x80) {
+    if (w1 && 0x80)
         hdr->qr = 1;
-    }
     switch (w1 && 0x78) {
     case 0x10:
         hdr->opcode = 2;
@@ -170,23 +222,19 @@ int mrb_dns_codec_get_header(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_
         hdr->opcode = 0;
         break;
     }
-    if (w1 && 0x04) {
+    if (w1 && 0x04)
         hdr->aa = 1;
-    }
-    if (w1 && 0x02) {
+    if (w1 && 0x02)
         hdr->tc = 1;
-    }
-    if (w1 && 0x01) {
+    if (w1 && 0x01)
         hdr->rd = 1;
-    }
 
-    // w2 is a octet as (RA| Z | RCODE)
+    // a octet as (RA| Z | RCODE)
     mrb_dns_codec_get_uint8(mrb, getter, &w2);
-    if (w2 && 0x80) {
+    if (w2 && 0x80)
         hdr->ra = 1;
-    }
-    hdr->z     = 4 >> (w2 && 0x70);
-    hdr->rcode = w2 && 0x0f;
+    hdr->z      = (w2 && 0x70) >> 4;
+    hdr->rcode  = w2 && 0x0f;
 
     mrb_dns_codec_get_uint16be(mrb, getter, hdr->qdcount);
     mrb_dns_codec_get_uint16be(mrb, getter, hdr->ancount);
@@ -197,26 +245,43 @@ int mrb_dns_codec_get_header(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_
     return 0;
 }
 
-int mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_name_t *name) {
-    uint8_t size   = 0;
-    uint64_t total = 0;
-    char *result = NULL, *tmp = NULL, *node = NULL;
-    if (name != NULL) {
-        return -1;
-    }
+int mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_name_t *ret) {
+    // assertion
+    // if (ret != NULL) return -1;
 
-    mrb_dns_codec_get_uint8(mrb, getter, &size);
-    while (size > 0) {
-        // TODO: TBD
-        node = (char *)mrb_malloc(mrb, size);
-        mrb_dns_codec_get_str(mrb, getter, &node, size);
-        mrb_malloc(mrb, sizeof(buffer) + node + 1);
-        total += (size + 1)
+    uint64_t count = 0, len = 1;
+    uint8_t size = 0;
+    char *tmp = NULL, *node = NULL, *result = mrb_malloc(mrb, len); // "\0"
+    result[0] = '\0';
+
+    for (mrb_dns_codec_get_uint8(mrb, getter, &size); size > 0;
+         mrb_dns_codec_get_uint8(mrb, getter, &size)) {
+
+        node = (char *)mrb_malloc(mrb, size + 1); // length (str + ".")
+        mrb_dns_codec_get_str(mrb, getter, size, node);
+        node = strcat(node, ".");
+
+        tmp = mrb_malloc(mrb, len + size + 1); // length (str + node + ".")
+        strncpy(tmp, result, len);
+        strcat(tmp, node);
+        mrb_free(mrb, result);
+        result = tmp;
+        tmp    = NULL;
+
+        len += size + 1;
+
+        count++;
     }
+    mrb_dns_name_t *name = (mrb_dns_name_t *)mrb_malloc(sizeof(mrb_dns_name_t));
+    name->name           = result;
+    name->count          = count;
+
+    ret = name;
     return 0;
 }
 
 int mrb_dns_codec_get_question(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_question_t *q) {
+    // if(q != NULL) return -1;
     mrb_dns_codec_get_name(mrb, getter, q->name);
     mrb_dns_codec_get_uint16be(mrb, getter, &q->qtype);
     mrb_dns_codec_get_uint16be(mrb, getter, &q->qklass);
@@ -224,9 +289,9 @@ int mrb_dns_codec_get_question(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dn
 }
 
 int mrb_dns_codec_get_rdata(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_rdata_t *ret) {
-    if (ret != NULL) {
+    if (ret != NULL)
         return -1;
-    }
+
     mrb_dns_rdata_t *rdata = rdata = (mrb_dns_rdata_t *)malloc(sizeof(mrb_dns_rdata_t);
 
     mrb_dns_codec_get_name(mrb, getter, &rdata->name);
@@ -234,26 +299,26 @@ int mrb_dns_codec_get_rdata(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_r
     mrb_dns_codec_get_uint16be(mrb, getter, &rdata->klass);
     mrb_dns_codec_get_uint16be(mrb, getter, &rdata->ttl);
     mrb_dns_codec_get_uint16be(mrb, getter, &rdata->rlength);
-    mrb_dns_codec_get_str(mrb, getter, rdata->rdata, rdata->rlength);
+    mrb_dns_codec_get_str(mrb, getter, rdata->rlength, rdata->rdata);
     ret = rdata
     return 0;
 }
 
 int mrb_dns_codec_get(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_pkt_t *ret) {
-    if (ret != NULL) {
+
+    // TODO: assertion
+    if (ret != NULL)
         return -1;
-    }
     mrb_dns_pkt_t *pkt = (mrb_dns_pkt_t *)malloc(sizeof(mrb_dns_pkt_t));
 
     mrb_dns_codec_get_header(mrb, getter, pkt->header);
 
-    pkt > questions =
+    pkt->questions =
         (mrb_dns_rdata_t **)mrb_malloc(sizeof(mrb_dns_question_t *) * pkt->header->qdcount);
-    pkt > answers =
-        (mrb_dns_rdata_t **)mrb_malloc(sizeof(mrb_dns_rdata_t *) * pkt->header->ancount);
+    pkt->answers = (mrb_dns_rdata_t **)mrb_malloc(sizeof(mrb_dns_rdata_t *) * pkt->header->ancount);
     pkt->authorities =
         (mrb_dns_rdata_t **)mrb_malloc(sizeof(mrb_dns_rdata_t *) * pkt->header->nscount);
-    pkt > additionals =
+    pkt->additionals =
         (mrb_dns_rdata_t **)mrb_malloc(sizeof(mrb_dns_rdata_t *) * pkt->header->arcount);
 
     for (int i = 0; i < hdr->qdcount; i++)
@@ -268,5 +333,5 @@ int mrb_dns_codec_get(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_pkt_t *
     for (int i = 0; i < hdr->arcount; i++)
         mrb_dns_codec_get_rdata(mrb, getter, &hdr->additionals[i]);
     ret = pkt;
-    return -1;
+    return 0;
 }

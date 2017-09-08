@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#if __linux__ == 1
+#include <arpa/inet.h>
+#endif
+
 #include "mruby.h"
 #include "dns_resolver.h"
 
