@@ -113,6 +113,7 @@ class Resolv
       attr_accessor :header, :questions, :answers, :authorities, :additionals
 
       def initialize(hdr, q, an, ns, ar)
+        ArgumentError unless hdr.is_a?(Header) || q.is_a?(Question) || an.is_a?(Answer) || ns.is_a?(Authority)
         @header = hdr
         @questions = q.nil? ? [] : q
         @answers = an.nil? ? [] : an
@@ -185,12 +186,12 @@ class Resolv
         def initialize(id, qr, opcode, aa, tc, rd, ra, rcode, qdcount, ancount, nscount, arcount)
           # TODO: value validation
           @id = id
-          @qr = qr
+          @qr = (qr == 1) ? 1 : 0
           @opcode = opcode
-          @aa = aa
-          @tc = tc
-          @rd = rd
-          @ra = ra
+          @aa = (aa == 1) ? 1 : 0
+          @tc = (tc == 1) ? 1 : 0
+          @rd = (rd == 1) ? 1 : 0
+          @ra = (ra == 1) ? 1 : 0
           @rcode = rcode
           @qdcount = qdcount
           @ancount = ancount
@@ -253,7 +254,7 @@ class Resolv
       end
 
       class Answer < Resolv::DNS::Query::RData; end
-      class Autority < Resolv::DNS::Query::RData; end
+      class Authority < Resolv::DNS::Query::RData; end
       class Addtional < Resolv::DNS::Query::RData; end
 
     end

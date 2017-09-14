@@ -24,12 +24,12 @@ static mrb_value mrb_dns_ctype2header(mrb_state *mrb, mrb_dns_header_t *hdr) {
 
     argv     = (mrb_value *)mrb_malloc(mrb, sizeof(mrb_value) * argc);
     argv[0]  = mrb_fixnum_value(hdr->id);
-    argv[1]  = mrb_fixnum_value(hdr->qr);
+    argv[1]  = mrb_fixnum_value(hdr->qr ? 1 : 0);
     argv[2]  = mrb_fixnum_value(hdr->opcode);
-    argv[3]  = mrb_fixnum_value(hdr->aa);
-    argv[4]  = mrb_fixnum_value(hdr->tc);
-    argv[5]  = mrb_fixnum_value(hdr->rd);
-    argv[6]  = mrb_fixnum_value(hdr->ra);
+    argv[3]  = mrb_fixnum_value(hdr->aa ? 1 : 0);
+    argv[4]  = mrb_fixnum_value(hdr->tc ? 1 : 0);
+    argv[5]  = mrb_fixnum_value(hdr->rd ? 1 : 0);
+    argv[6]  = mrb_fixnum_value(hdr->ra ? 1 : 0);
     argv[7]  = mrb_fixnum_value(hdr->rcode);
     argv[8]  = mrb_fixnum_value(hdr->qdcount);
     argv[9]  = mrb_fixnum_value(hdr->ancount);

@@ -359,8 +359,7 @@ mrb_dns_header_t *mrb_dns_codec_get_header(mrb_state *mrb, mrb_dns_get_state *ge
         mrb_raise(mrb, E_RUNTIME_ERROR, "header(QR|OPCODE|AA|TC|RD) get failure");
         return NULL;
     };
-    if (w1 & 0x80)
-        hdr->qr = 1;
+    hdr->qr = (w1 & 0x80) ? 1 : 0;
     switch (w1 & 0x78) {
     case 0x10:
         hdr->opcode = 2;
@@ -375,24 +374,20 @@ mrb_dns_header_t *mrb_dns_codec_get_header(mrb_state *mrb, mrb_dns_get_state *ge
         mrb_raise(mrb, E_RUNTIME_ERROR, "unkown opcode");
         break;
     }
-    if (w1 & 0x04)
-        hdr->aa = 1;
-    if (w1 & 0x02)
-        hdr->tc = 1;
-    if (w1 & 0x01)
-        hdr->rd = 1;
+    hdr->aa = (w1 & 0x04) ? 1 : 0;
+    hdr->tc = (w1 & 0x02) ? 1 : 0;
+    hdr->rd = (w1 & 0x01) ? 1 : 0;
 
     // a octet as (RA| Z|AD|CD| RCODE)
     if (mrb_dns_codec_get_uint8(mrb, getter, &w2)) {
         mrb_raise(mrb, E_RUNTIME_ERROR, "header(RA|Z|RCODE) get failure");
         return NULL;
     }
-    if (w2 & 0x80)
-        hdr->ra = 1;
-    hdr->z      = 0;
-    hdr->ad     = 0;
-    hdr->cd     = 0;
-    hdr->rcode  = w2 & 0x0f;
+    hdr->ra    = (w2 & 0x80) ? 1 : 0;
+    hdr->z     = 0;
+    hdr->ad    = 0;
+    hdr->cd    = 0;
+    hdr->rcode = w2 & 0x0f;
 
     if (mrb_dns_codec_get_uint16be(mrb, getter, &hdr->qdcount)) {
         mrb_raise(mrb, E_RUNTIME_ERROR, "header(QDCOUNT) get failure");
@@ -474,7 +469,7 @@ mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter
             return NULL;
         }
     }
-    if(mrb_dns_name_append(mrb, name, "\0", 1)){
+    if (mrb_dns_name_append(mrb, name, "\0", 1)) {
         return NULL;
     }
     return name;
