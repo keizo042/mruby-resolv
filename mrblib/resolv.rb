@@ -101,18 +101,14 @@ class Resolv
     end
 
     class Query
-      @header = nil
-      @questions = []
-      @answers = []
-      @authorities = []
-      @addtionals = []
+      attr_accessor :header, :questions, :answers, :authorities, :additionals
 
-      def initialize(hdr, q, ans, auth, ad = nil)
+      def initialize(hdr, q, an, ns, ar)
         @header = hdr
-        @questions = q
-        @answers = ans
-        @authorities = auth
-        @addtionals = ad
+        @questions = q.nil? ? [] : q
+        @answers = an.nil? ? [] : an
+        @authorities = ns.nil? ? [] : ns
+        @addtionals = ar.nil? ? [] : ar
       end
 
       class Header
@@ -200,6 +196,7 @@ class Resolv
           @klass = klass
           @ttl = ttl
           @rlength = rlength
+          # TODO:  accepting Fixnum
           @rdata = rdata
         end
       end

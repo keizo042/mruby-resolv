@@ -6,175 +6,138 @@
 #include "mruby/array.h"
 #include "mruby/class.h"
 #include "mruby/data.h"
+#include "mruby/hash.h"
 #include "mruby/string.h"
 #include "mruby/value.h"
 #include "mruby/variable.h"
 
+#include "dns_codec.h"
+#include "dns_types.h"
 
-typedef struct {
-} mrb_dns_data;
-
-static void mrb_dns_free(mrb_state *mrb, void *p) {}
-
-static const mrb_data_type mrb_dns_data_type = {
-    "mrb_dns_data", mrb_dns_free,
-};
-
-/**
-  *
-  * Resolv  class
-  *
- **/
-
-/**
- * Resolv#initialize
- **/
-
-static mrb_value mrb_resolv_init(mrb_state *mrb, mrb_value self) {
-    char *cache_server            = NULL;
-    const char *google_public_dns = "8.8.8.8";
-    struct RClass *resolv         = NULL;
-
-    resolv = mrb_module_get(mrb, "Resolv");
-
-    // TODO:  
-    // mrb_get_args(mrb, "|z", &cache_server);
-
-    if (cache_server == NULL) {
-        cache_server = (char *)mrb_malloc(mrb, strlen(google_public_dns));
-        strncpy(cache_server, google_public_dns, strlen(google_public_dns));
-    }
-
-    return self;
-}
 
 /**
  *
- * Resolv::DNS class
+ * Resolv::DNS::Codec class
  *
  **/
 
 /**
- * Resolv::DNS#initialize
+ * Resolv::DNS::Codec#initialize
  **/
-static mrb_value mrb_dns_init(mrb_state *mrb, mrb_value self) {
+static mrb_value mrb_dns_codec_init(mrb_state *mrb, mrb_value self) { return self; }
 
-    mrb_value option;
+/**
+ * Resolv::DNS::Codec#decode(bytes)
+ * @param bytes is [Fixnum]
+ * @return Resolv::DNS::Query
+ **/
 
-    if (mrb_get_args(mrb, "|o", &option) > 1) {
+static mrb_value mrb_dns_codec_decode(mrb_state *mrb, mrb_value self) {
+    mrb_value buff;
+    mrb_value query           = mrb_nil_value();
+    mrb_dns_get_state *getter = NULL;
+    mrb_dns_pkt_t *pkt        = NULL;
+    uint8_t *b                = NULL;
+    mrb_int len;
+
+    mrb_get_args(mrb, "o", &buff);
+    if (!mrb_array_p(buff)) {
+        mrb_raise(mrb, E_ARGUMENT_ERROR, "require Array of Fixnum 0~255");
+        return mrb_nil_value();
     }
-    return self;
+
+    len = RARRAY_LEN(buff);
+    b   = (uint8_t *)mrb_malloc(mrb, len * sizeof(uint8_t));
+    for (int i = 0; i < len; i++) {
+        b[i] = mrb_fixnum(mrb_ary_entry(buff, i));
+    }
+
+    getter = mrb_dns_codec_get_open(mrb, b, len);
+    if (!getter) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "fail memory allocation");
+        return mrb_nil_value();
+    }
+    pkt = mrb_dns_codec_get(mrb, getter);
+    if (!pkt) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "fail decode"); // TODO: therea are prefer exception
+        return mrb_nil_value();
+    }
+
+    return mrb_dns_ctype2query(mrb, pkt);
 }
+
 
 /**
- * Resolv::DNS#getaddress
+ * Resolv::DNS::Codec#encode(query)
+ *
+ * @param query is a Resolv::DNS::Query
+ * @return [Fixnum]
  **/
 
-static mrb_value mrb_dns_getaddress(mrb_state *mrb, mrb_value self) {
-    mrb_value address;
+static mrb_value mrb_dns_codec_encode(mrb_state *mrb, mrb_value self) {
+    int ret    = 0;
+    uint8_t *b = NULL;
 
-    mrb_get_args(mrb, "o", &address);
+    mrb_value p, bytes;
+    mrb_dns_put_state *putter = NULL;
+    mrb_dns_pkt_t *pkt        = NULL;
 
-    return mrb_nil_value();
+    mrb_get_args(mrb, "o", &p);
+    if (!mrb_obj_is_kind_of(
+            mrb, p,
+            mrb_class_get_under(mrb, mrb_class_get_under(mrb, mrb_class_get(mrb, "Resolv"), "DNS"),
+                                "Query"))) {
+        mrb_raisef(mrb, E_ARGUMENT_ERROR, "Resolv::DNS::Query");
+        return mrb_nil_value();
+    }
+
+    pkt = mrb_dns_query2cpkt(mrb, p);
+    if (!pkt) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "Resolv#encode: faliure converting to c ");
+        return mrb_nil_value();
+    }
+
+    putter = mrb_dns_codec_put_open(mrb);
+    if (!putter) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "Resolv#encode: invaild putter state");
+        return mrb_nil_value();
+    }
+
+    ret = mrb_dns_codec_put(mrb, putter, pkt);
+    if (ret) {
+        char buff[1024];
+        sprintf(buff, "Resolv#encode failure: ecode %d", ret);
+        mrb_raisef(mrb, E_RUNTIME_ERROR, buff);
+        return mrb_nil_value();
+    }
+
+    b     = mrb_dns_codec_put_result(mrb, putter);
+    bytes = mrb_ary_new(mrb);
+    for (int i = 0; i < putter->size; i++) 
+        mrb_ary_push(mrb, bytes, mrb_fixnum_value(b[i]));
+
+    mrb_dns_codec_put_close(mrb, putter);
+    return bytes;
 }
 
-/**
- * Resolv::DNS#getname
- **/
-
-static mrb_value mrb_dns_getname(mrb_state *mrb, mrb_value self) {
-    mrb_value name;
-
-    mrb_get_args(mrb, "o", &name);
-
-    return self;
-}
-
-static mrb_value mrb_dns_get_resource(mrb_state *mrb, mrb_value self) {
-    mrb_value v;
-    mrb_int rr;
-    mrb_get_args(mrb, "oi", &v, &rr);
-    return mrb_nil_value();
-}
-
-static mrb_value mrb_dns_get_resources(mrb_state *mrb, mrb_value self) {
-    mrb_value v;
-    mrb_int rrecord;
-
-    mrb_get_args(mrb, "oi", &v, &rrecord);
-    return mrb_nil_value();
-}
 
 /**
  * Init
  **/
 
-void mrb_mruby_resolv_dns_init(mrb_state *mrb, struct RClass *dns) {
-    mrb_define_method(mrb, dns, "initialize", mrb_dns_init, MRB_ARGS_ANY());
-
-    mrb_define_method(mrb, dns, "getaddress", mrb_dns_getaddress, MRB_ARGS_REQ(1));
-    mrb_define_method(mrb, dns, "getname", mrb_dns_getaddress, MRB_ARGS_REQ(1));
-    mrb_define_method(mrb, dns, "getresource", mrb_dns_get_resource, MRB_ARGS_REQ(2));
-    mrb_define_method(mrb, dns, "getresources", mrb_dns_get_resource, MRB_ARGS_REQ(2));
-}
-
-void mrb_mruby_resolv_dns_resource_init(mrb_state *mrb, struct RClass *dns) {
-    struct RClass *rsrc, *in;
-    struct RClass *a, *aaaa, *mx, *soa, *any, *txt, *ptr, *cname;
-    resrc = mrb_define_class_under(mrb, dns, "Resource", mrb->object_class);
-    in   = mrb_define_module_under(mrb, resrc, "IN");
-
-    a     = mrb_define_class_under(mrb, in, "A",        mrb->object_class);
-    MRB_SET_INSTANCE_TT(a, MRB_TT_DATA);
-    aaaa  = mrb_define_class_under(mrb, in, "AAAA",     mrb->object_class);
-    MRB_SET_INSTANCE_TT(aaaa, MRB_TT_DATA);
-    mx    = mrb_define_class_under(mrb, in, "MX",       mrb->object_class);
-    MRB_SET_INSTANCE_TT(mx, MRB_TT_DATA);
-    soa   = mrb_define_class_under(mrb, in, "SOA",      mrb->object_class);
-    MRB_SET_INSTANCE_TT(soa, MRB_TT_DATA);
-    any   = mrb_define_class_under(mrb, in, "ANY",      mrb->object_class);
-    MRB_SET_INSTANCE_TT(any, MRB_TT_DATA);
-    txt   = mrb_define_class_under(mrb, in, "TXT",      mrb->object_class);
-    MRB_SET_INSTANCE_TT(txt, MRB_TT_DATA);
-    ptr   = mrb_define_class_under(mrb, in, "PTR",      mrb->object_class);
-    MRB_SET_INSTANCE_TT(ptr, MRB_TT_DATA);
-    cname = mrb_define_class_under(mrb, in, "CNAME",    mrb->object_class);
-    MRB_SET_INSTANCE_TT(cname, MRB_TT_DATA);
-}
-
-void mrb_mruby_resolv_errors_init(mrb_state *mrb)
-{
-    struct RClass *resolv, *dns, *requester;
-    resolv = mrb_class_get(mrb, "Resolv");
-    dns = mrb_class_get_under(mrb, "DNS", resolv);
-    requester = mrb_define_class_under(mrb, dns, "Requester", mrb->object_class);
-
-
-    // Resolv
-    mrb_define_class_under(mrb, resolv, "DecodeError", mrb->StandardError_class);
-    mrb_define_class_under(mrb, resolv, "EncodeError", mrb->StandardError_class);
-    
-    // DNS
-    mrb_define_class_under(mrb, dns, "ResolvError", mrb->StandardError_class);
-
-    // Requester
-    mrb_define_class_under(mrb, requester, "RequestError", mrb->StandardError_class);
-}
-
-
 void mrb_mruby_resolv_gem_init(mrb_state *mrb) {
-    struct RClass *resolv = NULL, *dns = NULL;
+    struct RClass *resolv = NULL, *dns = NULL, *codec = NULL;
     resolv = mrb_define_class(mrb, "Resolv", mrb->object_class);
     MRB_SET_INSTANCE_TT(resolv, MRB_TT_DATA);
 
     dns = mrb_define_class_under(mrb, resolv, "DNS", mrb->object_class);
     MRB_SET_INSTANCE_TT(dns, MRB_TT_DATA);
 
-    mrb_define_method(mrb, resolv, "initialize", mrb_resolv_init, MRB_ARGS_ANY());
+    codec = mrb_define_class_under(mrb, dns, "Codec", mrb->object_class);
 
-    mrb_mruby_resolv_dns_init(mrb, dns);
-    mrb_mruby_resolv_dns_resource_init(mrb, dns);
-    mrb_mruby_resolv_errors_init(mrb);
+    mrb_define_method(mrb, codec, "initialize", mrb_dns_codec_init, MRB_ARGS_NONE());
+    mrb_define_method(mrb, codec, "decode", mrb_dns_codec_decode, MRB_ARGS_REQ(1));
+    mrb_define_method(mrb, codec, "encode", mrb_dns_codec_encode, MRB_ARGS_REQ(1));
 }
 
 void mrb_mruby_resolv_gem_final(mrb_state *mrb) {}

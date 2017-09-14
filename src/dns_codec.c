@@ -1,4 +1,19 @@
 
+/**
+  *
+  * Resolv::DNS::Codec class
+  *
+  *
+  **/
+
+#if __linux__ == 0
+#error "archtecture other than linux is not supported"
+#endif
+
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "mruby.h"
 
 #include "dns_codec.h"
@@ -8,7 +23,6 @@
  * Put
  **/
 
-// open put state.
 mrb_dns_put_state *mrb_dns_codec_put_open(mrb_state *mrb) {
     mrb_dns_put_state *putter = (mrb_dns_put_state *)mrb_malloc(mrb, sizeof(mrb_dns_put_state));
     putter->buff              = NULL;
@@ -16,16 +30,31 @@ mrb_dns_put_state *mrb_dns_codec_put_open(mrb_state *mrb) {
     return putter;
 }
 
+int mrb_dns_codec_put_close(mrb_state *mrb, mrb_dns_put_state *putter) {
+    if (!putter)
+        return 0;
+
+    if (putter->buff)
+        mrb_free(mrb, putter->buff);
+
+    if (putter)
+        mrb_free(mrb, putter);
+
+    return 0;
+}
+
 // put a octtet int bytes
 int mrb_dns_codec_put_uint8(mrb_state *mrb, mrb_dns_put_state *putter, uint8_t w) {
     const int size = putter->size + 1;
-    char *b        = (char *)mrb_malloc(mrb, size);
+    uint8_t *b     = (uint8_t *)mrb_malloc(mrb, size);
 
-    strncpy(b, putter->buff, putter->size);
-    b[size]     = w;
-    b[size + 1] = '\0';
+    if (putter->size > 0)
+        memcpy(b, putter->buff, putter->size);
+    b[size - 1] = w;
 
-    mrb_free(mrb, putter->buff);
+    if (putter->buff)
+        mrb_free(mrb, putter->buff);
+
     putter->buff = b;
     putter->size = size;
     return 0;
@@ -33,30 +62,35 @@ int mrb_dns_codec_put_uint8(mrb_state *mrb, mrb_dns_put_state *putter, uint8_t w
 
 // put 2 octtets value as big endian into bytes
 int mrb_dns_codec_put_uint16be(mrb_state *mrb, mrb_dns_put_state *putter, uint16_t w) {
-    const int size = putter->size + 2;
-    char *b        = (char *)mrb_malloc(mrb, size);
+    uint8_t w1 = 0, w2 = 0;
+    w1 = w & 0x00ff;
+    w2 = (w & 0xff00) >> 8;
 
-    strncpy(b, putter->buff, putter->size);
-    b[size]     = (w && 0xff);
-    b[size + 1] = (w && 0xff00) >> 8;
-    b[size + 2] = '\0';
-
-    mrb_free(mrb, putter->buff);
-    putter->buff = b;
-    putter->size = size;
+    if (mrb_dns_codec_put_uint8(mrb, putter, w2)) {
+        return -1;
+    }
+    if (mrb_dns_codec_put_uint8(mrb, putter, w1)) {
+        return -1;
+    }
 
     return 0;
 }
 
-int mrb_dns_codec_put_str(mrb_state *mrb, mrb_dns_put_state *putter, char *buff, uint64_t len) {
+/**
+ * put bytes
+ */
+int mrb_dns_codec_put_str(mrb_state *mrb, mrb_dns_put_state *putter, char *buff, size_t len) {
     const int size = putter->size + len;
     char *b        = (char *)mrb_malloc(mrb, size);
 
-    strncpy(b, putter->buff, putter->size);
-    b = strcat(b, buff);
+    if (putter->size > 0)
+        memcpy(b, putter->buff, putter->size);
 
-    mrb_free(mrb, putter->buff);
-    putter->buff = b;
+    strncpy(b + putter->size, buff, len);
+    if (putter->buff)
+        mrb_free(mrb, putter->buff);
+
+    putter->buff = (uint8_t *)b;
     putter->size = size;
     return 0;
 }
@@ -68,128 +102,239 @@ int mrb_dns_codec_put_str(mrb_state *mrb, mrb_dns_put_state *putter, char *buff,
 
 int mrb_dns_codec_put_name(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_name_t *name) {
     char *tok = NULL;
+    int len   = 0;
 
-    for (strtok(name->name, "."); tok != NULL, tok = strtok(NULL, ".")) {
-        int len = strlen(tok);
-        if (mrb_dns_codec_put_uint8(mrb, putter, len))
-            return -1;
-        if (mrb_dns_codec_put_str(mrb, putter, tok, len))
-            return -1;
+    if (!name) {
+        mrb_raise(mrb, E_ARGUMENT_ERROR, "mrb_dns_codec_put_name: null pointer");
+        return -1;
     }
+    if (!name->name) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "QUESTION(NAME) failure");
+        return -1;
+    }
+    tok = strtok(name->name, ".");
+    if (tok) {
+        // TODO: remove strtok for thread-aware
+        for (; tok != NULL; tok = strtok(NULL, ".")) {
+            len = strlen(tok);
+            if (len == 0)
+                break;
 
+            if (mrb_dns_codec_put_uint8(mrb, putter, len)) {
+                mrb_raise(mrb, E_RUNTIME_ERROR, "QUESTION(NAME(DIGIT))");
+                return -1;
+            }
+            if (mrb_dns_codec_put_str(mrb, putter, tok, len)) {
+                mrb_raise(mrb, E_RUNTIME_ERROR, "QUESTION(NAME(STR))");
+                return -1;
+            }
+        }
+    }
+    if (mrb_dns_codec_put_uint8(mrb, putter, 0)) {
+        return -1;
+    }
     return 0;
 }
 
 int mrb_dns_codec_put_header(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_header_t *hdr) {
-    mrb_dns_codec_put_uint16be(mrb, putter, hdr->id);
-    mrb_dns_codec_put_uint8(
-        mrb, putter, hdr->qr << 7 || hdr->opcode << 3 || hdr->aa << 2 || hdr->tc << 1 || hdr->td);
-    mrb_dns_codec_put_uint8(mrb, putter, hdr->z << 4 || hdr->rcode);
-    mrb_dns_codec_put_uint16be(mrb, putter, hdr->qdcount);
-    mrb_dns_codec_put_uint16be(mrb, putter, hdr->ancount);
-    mrb_dns_codec_put_uint16be(mrb, putter, hdr->nscount);
-    mrb_dns_codec_put_uitn16be(mrb, putter, hdr->arcount);
+    uint8_t w1 = 0, w2 = 0;
+    if (mrb_dns_codec_put_uint16be(mrb, putter, hdr->id)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(ID) put failure");
+        return -1;
+    };
+    // QR(1) | OPCODE(4) | AA(1)  | TC(1) | RD(1)
+    w1 = (uint8_t)((hdr->qr << 7) | (hdr->opcode << 3) | (hdr->aa << 2) | (hdr->tc << 1) | hdr->rd);
+    if (mrb_dns_codec_put_uint8(mrb, putter, w1)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(QR|OPCOD|AA|TC|RD) put failure");
+        return -1;
+    };
+
+    // RA(1) | Z(3) | RCODE(4)
+    w2 = (uint8_t)((hdr->ra << 7) | (hdr->z << 4) | (hdr->rcode));
+    if (mrb_dns_codec_put_uint8(mrb, putter, w2)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(RA|Z|RCODE) put failure");
+        return -1;
+    }
+    if (mrb_dns_codec_put_uint16be(mrb, putter, hdr->qdcount)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(QDCOUNT) put failure");
+        return -1;
+    }
+    if (mrb_dns_codec_put_uint16be(mrb, putter, hdr->ancount)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(ANCOUNT) put failure");
+        return -1;
+    }
+    if (mrb_dns_codec_put_uint16be(mrb, putter, hdr->nscount)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(NSCOUNT) put failure");
+        return -1;
+    }
+    if (mrb_dns_codec_put_uint16be(mrb, putter, hdr->arcount)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(ARCOUNT) put failure");
+        return -1;
+    }
     return 0;
 }
 
 int mrb_dns_codec_put_question(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_question_t *q) {
-    if (mrb_dns_codec_put_name(mrb, putter, q->qname))
+    if (!q) {
+        mrb_raise(mrb, E_ARGUMENT_ERROR, "mrb_dns_codec_put_question: null pointer");
         return -1;
-    if (mrb_dns_codec_put_uint16be(mrb, putter, q->qtype))
+    }
+    if (mrb_dns_codec_put_name(mrb, putter, q->qname)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "QUESTION(NAME) put failure");
         return -1;
+    }
+    if (mrb_dns_codec_put_uint16be(mrb, putter, q->qtype)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "inviald type in question section");
+        return -1;
+    }
+    if (mrb_dns_codec_put_uint16be(mrb, putter, q->qklass)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "inviald class in question section");
+        return -1;
+    }
     return 0;
 }
 
-int mrb_dns_codec_put_rdata(mrb_state *mrb, mrb_dns_put_state *codec, mrb_dns_rdata_t *rdata) {
-    mrb_dns_codec_put_name(mrb, putter, rdata->name);
-    mrb_dns_codec_put_uint16be(mrb, putter, rdata->type);
-    mrb_dns_codec_put_uint16be(mrb, putter, rdata->klass);
-    mrb_dns_codec_put_uint16be(mrb, putter, rdata->ttl);
-    mrb_dns_codec_put_uint16be(mrb, putter, rdata->rlength);
-    mrb_dns_codec_put_str(mrb, putter, rdata->rdata, rdata->rlength);
+int mrb_dns_codec_put_rdata(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_rdata_t *rdata) {
+    mrb_assert(rdata != NULL);
+    if (mrb_dns_codec_put_name(mrb, putter, rdata->name))
+        return -1;
+    if (mrb_dns_codec_put_uint16be(mrb, putter, rdata->typ))
+        return -1;
+    if (mrb_dns_codec_put_uint16be(mrb, putter, rdata->klass))
+        return -1;
+    if (mrb_dns_codec_put_uint16be(mrb, putter, rdata->ttl))
+        return -1;
+    if (mrb_dns_codec_put_uint16be(mrb, putter, rdata->rlength))
+        return -1;
+    if (mrb_dns_codec_put_str(mrb, putter, (char *)rdata->rdata, rdata->rlength))
+        return -1;
     return 0;
 }
 
 int mrb_dns_codec_put(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_pkt_t *pkt) {
-    mrb_dns_codec_put_header(mrb, putter, pkt->header);
+    if (!pkt) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "mrb_dns_codec_put: null pkt");
+        return -1;
+    }
+    if (!pkt->header) {
+        mrb_raise(mrb, E_ARGUMENT_ERROR, "mrb_dns_codec_put: null pkt.header");
+        return -1;
+    }
+    if (mrb_dns_codec_put_header(mrb, putter, pkt->header)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "mrb_dns_codec_put: packet.header failure");
+        return -1;
+    }
+
     for (int i = 0; i < pkt->header->qdcount; i++) {
-        mrb_dns_codec_put_question(mrb, putter, &pkt->questions[i]);
+        if (mrb_dns_codec_put_question(mrb, putter, pkt->questions[i])) {
+            char buff[1024];
+            sprintf(buff, "failure: put packet.question[%d] record", i);
+            mrb_raise(mrb, E_RUNTIME_ERROR, buff);
+            return -1;
+        }
     }
     for (int i = 0; i < pkt->header->ancount; i++) {
-        mrb_dns_codec_put_rdata(mrb, putter, &pkt->answers[i]);
+        if (mrb_dns_codec_put_rdata(mrb, putter, pkt->answers[i])) {
+            char buff[1024];
+            sprintf(buff, "failure: put packet.answer[%d] record", i);
+            mrb_raise(mrb, E_RUNTIME_ERROR, buff);
+            return -1;
+        }
     }
     for (int i = 0; i < pkt->header->nscount; i++) {
-        mrb_dns_codec_put_rdata(mrb, putter, &pkt->authorities[i]);
+        if (mrb_dns_codec_put_rdata(mrb, putter, pkt->authorities[i])) {
+            char buff[1024];
+            sprintf(buff, "failure: put packet.authorty[%d] record", i);
+            mrb_raise(mrb, E_RUNTIME_ERROR, buff);
+            return -1;
+        }
     }
     for (int i = 0; i < pkt->header->arcount; i++) {
-        mrb_dns_codec_put_rdata(mrb, putter & pkt->additionals[i]);
+        if (mrb_dns_codec_put_rdata(mrb, putter, pkt->additionals[i])) {
+            char buff[1024];
+            sprintf(buff, "failure: put packet.addtional[%d] record", i);
+            mrb_raise(mrb, E_RUNTIME_ERROR, buff);
+            return -1;
+        }
     }
-    return -1;
+    if (!putter->buff) {
+        mrb_raise(mrb, E_NOTIMP_ERROR, "falure: empty put result");
+        return -1;
+    }
+
+    return 0;
+}
+
+uint8_t *mrb_dns_codec_put_result(mrb_state *mrb, mrb_dns_put_state *putter) {
+    return putter->buff;
 }
 
 /**
  *  Get
  **/
 
-mrb_dns_get_state *mrb_dns_codec_get_open(mrb_state *mrb, char *buff) {
+mrb_dns_get_state *mrb_dns_codec_get_open(mrb_state *mrb, uint8_t *buff, size_t len) {
     mrb_dns_get_state *state = (mrb_dns_get_state *)mrb_malloc(mrb, sizeof(mrb_dns_get_state));
-    uint64_t ssize           = strlen(buff);
-    uint64_t bsize           = ssize + 1;
-    char *b                  = (char *)mrb_malloc(mrb, bsize);
-    if (!b) return NULL;
-    strnpcy(b, buff, ssize);
+    uint8_t *b               = (uint8_t *)mrb_malloc(mrb, len);
+    memcpy(b, buff, len);
 
     state->buff = b;
-    state->len  = 0;
-    state->end  = ssize;
+    state->pos  = 0;
+    state->end  = len;
     return state;
 }
 
 int mrb_dns_codec_get_close(mrb_state *mrb, mrb_dns_get_state *getter) {
-    mrb_free(mrb, getter->buff);
-    mrb_free(mrb, getter);
+    if (getter->buff)
+        mrb_free(mrb, getter->buff);
+    if (getter)
+        mrb_free(mrb, getter);
     getter = NULL;
     return 0;
 }
 
-int mrb_dns_codec_get_uint8(mrb_state *mrb, mrb_dns_get_state *getter, uint8_t *w1) {
-    // TODO: assertion
-    if (w1 == NULL)
-        return -1;
+int mrb_dns_codec_get_uint8(mrb_state *mrb, mrb_dns_get_state *getter, uint8_t *w) {
+    uint64_t pos = 0;
+    mrb_assert(w != NULL);
+
     pos = getter->pos;
     if (pos + 1 > getter->end)
         return -1;
-    if (getter->buff[pos] == '\0')
-        return -1;
 
-    w2 = getter->buff[pos];
+    *w = getter->buff[pos];
     getter->pos++;
 
     return 0;
 }
 
-int mrb_dns_codec_get_uint16be(mrb_state *mrb, mrb_dns_get_state *getter, uint16_t *w2) {
-    if (w2 == NULL)
-        return -1;
-    int pos = getter->pos;
-    if (pos + 2 > getter->end)
-        return -1;
-    if (getter->buff[pos + 2] == '\0')
-        return -1;
+int mrb_dns_codec_get_uint16be(mrb_state *mrb, mrb_dns_get_state *getter, uint16_t *w) {
+    uint16_t ret = 0;
+    uint8_t w1 = 0, w2 = 0;
+    mrb_assert(w != NULL);
 
-    w2 = getter->buff[pos + 1] << 8 + getter->buff[pos];
-    getter->pos += 2;
+    if (mrb_dns_codec_get_uint8(mrb, getter, &w1)) {
+        return -1;
+    }
+    if (mrb_dns_codec_get_uint8(mrb, getter, &w2)) {
+        return -1;
+    }
+    ret = w1 << 8 | w2;
+    *w  = ret;
     return 0;
 }
 
-int mrb_dns_codec_get_str(mrb_state *mrb, mrb_dns_get_state *getter, uint64_t size, char *dist) {
-    if (dist != NULL)
-        return -1;
-    dist = (char *)malloc(size + 1);
-    strnpcy(dist, getter->buff + getter->pos, size);
+char *mrb_dns_codec_get_str(mrb_state *mrb, mrb_dns_get_state *getter, uint64_t size) {
+    char *d = NULL;
+    if (getter->pos + size > getter->end) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "mrb_dns_codec_get_str: reach end of buffer");
+        return NULL;
+    }
+
+    d = (char *)mrb_malloc(mrb, size);
+    memcpy(d, getter->buff + getter->pos, size);
     getter->pos += size;
 
-    return 0;
+    return d;
 }
 
 /**
@@ -197,140 +342,221 @@ int mrb_dns_codec_get_str(mrb_state *mrb, mrb_dns_get_state *getter, uint64_t si
  **/
 
 
-int mrb_dns_codec_get_header(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_header_t *ret) {
-    // TODO: assertion and validation
-    if (ret != NULL)
-        return -1;
-
+mrb_dns_header_t *mrb_dns_codec_get_header(mrb_state *mrb, mrb_dns_get_state *getter) {
     uint8_t w1 = 0, w2 = 0;
-    mrb_dns_header_t *hdr = (mrb_dns_header_t *)malloc(sizeof(mrb_dns_header_t));
-    mrb_dns_codec_get_uint16be(mrb_state * mrb, mrb_dns_get_state * getter, &hdr->id);
+    mrb_dns_header_t *hdr = NULL;
+    // TODO: assertion and validation
+    // mrb_assert(ret == NULL);
+
+    hdr = (mrb_dns_header_t *)malloc(sizeof(mrb_dns_header_t));
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &hdr->id)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(id) get failure");
+        return NULL;
+    }
 
     // a octet as (QR | OPCODE | AA | TC |RD)
-    mrb_dns_codec_get_uint8(mrb, getter, &w1);
-    if (w1 && 0x80)
+    if (mrb_dns_codec_get_uint8(mrb, getter, &w1)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(QR|OPCODE|AA|TC|RD) get failure");
+        return NULL;
+    };
+    if (w1 & 0x80)
         hdr->qr = 1;
-    switch (w1 && 0x78) {
+    switch (w1 & 0x78) {
     case 0x10:
         hdr->opcode = 2;
         break;
     case 0x08:
         hdr->opcode = 1;
         break;
-    default:
+    case 0x00:
         hdr->opcode = 0;
         break;
+    default:
+        mrb_raise(mrb, E_RUNTIME_ERROR, "unkown opcode");
+        break;
     }
-    if (w1 && 0x04)
+    if (w1 & 0x04)
         hdr->aa = 1;
-    if (w1 && 0x02)
+    if (w1 & 0x02)
         hdr->tc = 1;
-    if (w1 && 0x01)
+    if (w1 & 0x01)
         hdr->rd = 1;
 
-    // a octet as (RA| Z | RCODE)
-    mrb_dns_codec_get_uint8(mrb, getter, &w2);
-    if (w2 && 0x80)
-        hdr->ra = 1;
-    hdr->z      = (w2 && 0x70) >> 4;
-    hdr->rcode  = w2 && 0x0f;
-
-    mrb_dns_codec_get_uint16be(mrb, getter, hdr->qdcount);
-    mrb_dns_codec_get_uint16be(mrb, getter, hdr->ancount);
-    mrb_dns_codec_get_uint16be(mrb, getter, hdr->nscount);
-    mrb_dns_codec_get_uint16be(mrb, getter, hdr->arcount);
-
-    ret = hdr;
-    return 0;
-}
-
-int mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_name_t *ret) {
-    // assertion
-    // if (ret != NULL) return -1;
-
-    uint64_t count = 0, len = 1;
-    uint8_t size = 0;
-    char *tmp = NULL, *node = NULL, *result = mrb_malloc(mrb, len); // "\0"
-    result[0] = '\0';
-
-    for (mrb_dns_codec_get_uint8(mrb, getter, &size); size > 0;
-         mrb_dns_codec_get_uint8(mrb, getter, &size)) {
-
-        node = (char *)mrb_malloc(mrb, size + 1); // length (str + ".")
-        mrb_dns_codec_get_str(mrb, getter, size, node);
-        node = strcat(node, ".");
-
-        tmp = mrb_malloc(mrb, len + size + 1); // length (str + node + ".")
-        strncpy(tmp, result, len);
-        strcat(tmp, node);
-        mrb_free(mrb, result);
-        result = tmp;
-        tmp    = NULL;
-
-        len += size + 1;
-
-        count++;
+    // a octet as (RA| Z|AD|CD| RCODE)
+    if (mrb_dns_codec_get_uint8(mrb, getter, &w2)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(RA|Z|RCODE) get failure");
+        return NULL;
     }
-    mrb_dns_name_t *name = (mrb_dns_name_t *)mrb_malloc(sizeof(mrb_dns_name_t));
-    name->name           = result;
-    name->count          = count;
+    if (w2 & 0x80)
+        hdr->ra = 1;
+    hdr->z      = 0;
+    hdr->ad     = 0;
+    hdr->cd     = 0;
+    hdr->rcode  = w2 & 0x0f;
 
-    ret = name;
-    return 0;
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &hdr->qdcount)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(QDCOUNT) get failure");
+        return NULL;
+    }
+
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &hdr->ancount)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(ANCOUNT) get failure");
+        return NULL;
+    }
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &hdr->nscount)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(NSCOUNT) get failure");
+        return NULL;
+    }
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &hdr->arcount)) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header(ARCOUNT) get failure");
+        return NULL;
+    }
+
+    return hdr;
 }
 
-int mrb_dns_codec_get_question(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_question_t *q) {
-    // if(q != NULL) return -1;
-    mrb_dns_codec_get_name(mrb, getter, q->name);
-    mrb_dns_codec_get_uint16be(mrb, getter, &q->qtype);
-    mrb_dns_codec_get_uint16be(mrb, getter, &q->qklass);
-    return 0;
-}
-
-int mrb_dns_codec_get_rdata(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_rdata_t *ret) {
-    if (ret != NULL)
+static int mrb_dns_name_append(mrb_state *mrb, mrb_dns_name_t *name, char *node, size_t len) {
+    char *buff = NULL;
+    size_t l   = 0;
+    if (!name) {
+        mrb_raise(mrb, E_ARGUMENT_ERROR, "mrb_dns_name_append: empty name");
         return -1;
+    }
+    if (!node) {
+        mrb_raise(mrb, E_ARGUMENT_ERROR, "mrb_dns_name_append: empty node");
+        return -1;
+    }
+    if (!name->name) {
+        l    = len;
+        buff = (char *)mrb_malloc(mrb, sizeof(char) * len);
 
-    mrb_dns_rdata_t *rdata = rdata = (mrb_dns_rdata_t *)malloc(sizeof(mrb_dns_rdata_t);
+        memcpy(buff, node, len);
+    } else {
+        l    = name->len + 1 + len;
+        buff = (char *)mrb_malloc(mrb, sizeof(char) * l);
 
-    mrb_dns_codec_get_name(mrb, getter, &rdata->name);
-    mrb_dns_codec_get_uint16be(mrb, getter, &rdata->type);
-    mrb_dns_codec_get_uint16be(mrb, getter, &rdata->klass);
-    mrb_dns_codec_get_uint16be(mrb, getter, &rdata->ttl);
-    mrb_dns_codec_get_uint16be(mrb, getter, &rdata->rlength);
-    mrb_dns_codec_get_str(mrb, getter, rdata->rlength, rdata->rdata);
-    ret = rdata
+        memcpy(buff, name->name, name->len);
+        buff[name->len] = '.';
+        memcpy(buff + name->len + 1, node, len);
+        mrb_free(mrb, name->name);
+    }
+
+
+    name->name = buff;
+    name->len  = l;
     return 0;
 }
 
-int mrb_dns_codec_get(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_pkt_t *ret) {
+mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter) {
+    mrb_dns_name_t *name = NULL;
+    uint8_t len          = 0;
+    // TODO: compression-aware
 
-    // TODO: assertion
-    if (ret != NULL)
-        return -1;
-    mrb_dns_pkt_t *pkt = (mrb_dns_pkt_t *)malloc(sizeof(mrb_dns_pkt_t));
+    name       = (mrb_dns_name_t *)mrb_malloc(mrb, sizeof(mrb_dns_name_t));
+    name->name = NULL;
+    name->len  = 0;
 
-    mrb_dns_codec_get_header(mrb, getter, pkt->header);
+    for (mrb_dns_codec_get_uint8(mrb, getter, &len); len > 0;
+         mrb_dns_codec_get_uint8(mrb, getter, &len)) {
+        char *node = NULL;
+        if (0xC0 & len) {
+            // TODO: implement compression
+            mrb_raise(mrb, E_NOTIMP_ERROR, "mrb_dns_codec_get_name: compression");
+            break;
+        }
+        node = mrb_dns_codec_get_str(mrb, getter, len);
+        if (!node) {
+            mrb_raise(mrb, E_RUNTIME_ERROR, "");
+            return NULL;
+        }
+        if (mrb_dns_name_append(mrb, name, node, len)) {
+            mrb_raise(mrb, E_RUNTIME_ERROR, "");
+            return NULL;
+        }
+    }
+    if(mrb_dns_name_append(mrb, name, "\0", 1)){
+        return NULL;
+    }
+    return name;
+}
+
+mrb_dns_question_t *mrb_dns_codec_get_question(mrb_state *mrb, mrb_dns_get_state *getter) {
+    mrb_dns_question_t *q = NULL;
+    q                     = (mrb_dns_question_t *)mrb_malloc(mrb, sizeof(mrb_dns_question_t));
+    q->qname              = NULL;
+    q->qtype              = 0;
+    q->qklass             = 0;
+    if (!(q->qname = mrb_dns_codec_get_name(mrb, getter))) {
+        return NULL;
+    }
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &q->qtype)) {
+        return NULL;
+    }
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &q->qklass)) {
+        return NULL;
+    }
+    return q;
+}
+
+mrb_dns_rdata_t *mrb_dns_codec_get_rdata(mrb_state *mrb, mrb_dns_get_state *getter) {
+    mrb_dns_rdata_t *rdata = (mrb_dns_rdata_t *)malloc(sizeof(mrb_dns_rdata_t));
+
+    if (!(rdata->name = mrb_dns_codec_get_name(mrb, getter))) {
+        return NULL;
+    }
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &rdata->typ)) {
+        return NULL;
+    }
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &rdata->klass)) {
+        return NULL;
+    }
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &rdata->ttl)) {
+        return NULL;
+    }
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &rdata->rlength)) {
+        return NULL;
+    }
+    rdata->rdata = (uint8_t *)mrb_dns_codec_get_str(mrb, getter, rdata->rlength);
+    return rdata;
+}
+
+mrb_dns_pkt_t *mrb_dns_codec_get(mrb_state *mrb, mrb_dns_get_state *getter) {
+    mrb_dns_pkt_t *pkt = (mrb_dns_pkt_t *)mrb_malloc(mrb, sizeof(mrb_dns_pkt_t));
+
+    if (!(pkt->header = mrb_dns_codec_get_header(mrb, getter))) {
+        mrb_raise(mrb, E_RUNTIME_ERROR, "header codec failure");
+        return NULL;
+    };
 
     pkt->questions =
-        (mrb_dns_rdata_t **)mrb_malloc(sizeof(mrb_dns_question_t *) * pkt->header->qdcount);
-    pkt->answers = (mrb_dns_rdata_t **)mrb_malloc(sizeof(mrb_dns_rdata_t *) * pkt->header->ancount);
+        (mrb_dns_question_t **)mrb_malloc(mrb, sizeof(mrb_dns_question_t *) * pkt->header->qdcount);
+    pkt->answers =
+        (mrb_dns_rdata_t **)mrb_malloc(mrb, sizeof(mrb_dns_rdata_t *) * pkt->header->ancount);
     pkt->authorities =
-        (mrb_dns_rdata_t **)mrb_malloc(sizeof(mrb_dns_rdata_t *) * pkt->header->nscount);
+        (mrb_dns_rdata_t **)mrb_malloc(mrb, sizeof(mrb_dns_rdata_t *) * pkt->header->nscount);
     pkt->additionals =
-        (mrb_dns_rdata_t **)mrb_malloc(sizeof(mrb_dns_rdata_t *) * pkt->header->arcount);
+        (mrb_dns_rdata_t **)mrb_malloc(mrb, sizeof(mrb_dns_rdata_t *) * pkt->header->arcount);
 
-    for (int i = 0; i < hdr->qdcount; i++)
-        mrb_dns_codec_get_question(mrb, getter, &hdr->questions[i]);
+    // TODO: validation
+    for (int i = 0; i < pkt->header->qdcount; i++) {
+        if (!(pkt->questions[i] = mrb_dns_codec_get_question(mrb, getter)))
+            return NULL;
+    }
 
-    for (int i = 0; i < hdr->ancount; i++)
-        mrb_dns_codec_get_rdata(mrb, getter, &hdr->answers[i]);
+    for (int i = 0; i < pkt->header->ancount; i++) {
+        if (!(pkt->answers[i] = mrb_dns_codec_get_rdata(mrb, getter)))
+            return NULL;
+    }
 
-    for (int i = 0; i < hdr->nscount; i++)
-        mrb_dns_codec_get_rdata(mrb, getter, &hdr->authorities[i]);
+    for (int i = 0; i < pkt->header->nscount; i++) {
+        if (!(pkt->authorities[i] = mrb_dns_codec_get_rdata(mrb, getter)))
+            return NULL;
+    }
 
-    for (int i = 0; i < hdr->arcount; i++)
-        mrb_dns_codec_get_rdata(mrb, getter, &hdr->additionals[i]);
-    ret = pkt;
-    return 0;
+    for (int i = 0; i < pkt->header->arcount; i++) {
+        if (!(pkt->additionals[i] = mrb_dns_codec_get_rdata(mrb, getter)))
+            return NULL;
+    }
+
+    return pkt;
 }
