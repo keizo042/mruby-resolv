@@ -77,6 +77,15 @@ class Resolv
       raise NotImplementedError
     end
 
+    def open
+    end
+
+    def send(pkt)
+    end
+
+    def recv
+    end
+
     class IPv4
       @octets = []
 
@@ -108,10 +117,19 @@ class Resolv
         @questions = q.nil? ? [] : q
         @answers = an.nil? ? [] : an
         @authorities = ns.nil? ? [] : ns
-        @addtionals = ar.nil? ? [] : ar
+        @additionals = ar.nil? ? [] : ar
+      end
+
+      def ==(rval)
+        self.header == rval.header &&
+          self.questions == rval.questions &&
+          self.answers == rval.answers &&
+          self.authorities == rval.authorities &&
+          self.additionals == rval.additionals
       end
 
       class Header
+        attr_reader :id, :qr, :opcode, :aa, :tc, :rd, :ra, :z, :rcode, :qdcount, :ancount, :nscount, :arcount
 
         @id = 0
         @qr = 0
@@ -179,10 +197,18 @@ class Resolv
           @nscount = nscount
           @arcount = arcount
         end
+
+        def == (rval)
+          self.id  == rval.id && self.qr == rval.qr && self.opcode == rval.opcode && self.aa == rval.aa &&
+            self.tc == rval.tc && self.rd == rval.rd && self.ra == rval.ra && self.rcode == rval.rcode &&
+            self.qdcount == rval.qdcount && self.ancount == rval.ancount && self.arcount == rval.arcount
+
+        end
       end
 
 
       class RData
+        attr_reader :name, :typ, :klass, :ttl, :rlength, :rdata
         @name = ""
         @typ = 0
         @klass = 0
@@ -199,9 +225,16 @@ class Resolv
           # TODO:  accepting Fixnum
           @rdata = rdata
         end
+
+        def ==(rval)
+          self.name == rval.name && self.typ == rval.typ &&
+            self.klass == rval.klass && self.ttl == rval.ttl &&
+            self.rlength == rval.rlength && self.rdata == rval.rdata
+        end
       end
 
       class Question
+        attr_reader :qname, :qtype, :qklass
         @qname = nil
         @qtype = nil
         @qklass = nil
@@ -210,6 +243,11 @@ class Resolv
           @qname = qname
           @qtype = qtype
           @qklass = qklass
+        end
+        def ==(rval)
+          self.qname == rval.qname &&
+            self.qtype == rval.qtype &&
+            self.qklass == rval.qklass 
         end
       end
 
