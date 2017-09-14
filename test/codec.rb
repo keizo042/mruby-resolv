@@ -88,7 +88,7 @@ assert("Resolv::DNS::Codec#encode/decode Header|Question ") do
   assert_equal expected.additionals, actual.additionals
 end
 
-assert("Resolv::DNS::Codec#encode/decode Header|Answer ") do
+assert("Resolv::DNS::Codec#encode/decode Header|Answer") do
   expected = Resolv::DNS::Query.new(
     cliheader(0,1,0,0),
     [],
@@ -97,7 +97,7 @@ assert("Resolv::DNS::Codec#encode/decode Header|Answer ") do
                                     1,
                                     86400,
                                     4,
-                                    0x03030303) # 08888
+                                    "\b\b\b\b")
   ],
    [],
    [])
