@@ -209,7 +209,7 @@ class Resolv
 
 
       class RData
-        attr_reader :name, :typ, :klass, :ttl, :rlength, :rdata
+        attr_reader :name, :typ, :klass, :ttl, :rlength
         @name = ""
         @typ = 0
         @klass = 0
@@ -217,7 +217,7 @@ class Resolv
         @rlength = 0
         @rdata = nil
 
-        def initialize(name, typ, klass, ttl ,rlength, rdata)
+        def initialize(name, typ, klass, ttl, rlength, rdata)
           @name = name
           @typ = typ
           @klass = klass
@@ -228,9 +228,16 @@ class Resolv
         end
 
         def ==(rval)
-          self.name == rval.name && self.typ == rval.typ &&
-            self.klass == rval.klass && self.ttl == rval.ttl &&
-            self.rlength == rval.rlength && self.rdata == rval.rdata
+          self.name == rval.name && 
+            self.typ == rval.typ &&
+            self.klass == rval.klass && 
+            self.ttl == rval.ttl &&
+            self.rlength == rval.rlength && 
+            self.rdata == rval.rdata
+        end
+
+        def rdata
+          rdata.bytes.slice(0, self.rlength - 1) 
         end
       end
 

@@ -97,7 +97,7 @@ assert("Resolv::DNS::Codec#encode/decode Header|Answer") do
                                     1,
                                     86400,
                                     4,
-                                    "\b\b\b\b")
+                                    [8,8,8,8])
   ],
    [],
    [])

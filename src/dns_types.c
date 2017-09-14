@@ -54,7 +54,7 @@ static mrb_value mrb_dns_ctype2question(mrb_state *mrb, mrb_dns_question_t *q) {
 
 mrb_value mrb_dns_ctype2rdata(mrb_state *mrb, mrb_dns_rdata_t *r) {
     struct RClass *rdata_class = NULL;
-    mrb_value *argv            = NULL;
+    mrb_value bytes, *argv            = NULL;
     const mrb_int argc         = 6;
     mrb_assert(r != NULL);
     rdata_class = MRB_SECTION_CLASS_GET(mrb, "RData");
@@ -65,9 +65,12 @@ mrb_value mrb_dns_ctype2rdata(mrb_state *mrb, mrb_dns_rdata_t *r) {
     argv[2] = mrb_fixnum_value(r->typ);
     argv[3] = mrb_fixnum_value(r->ttl);
     argv[4] = mrb_fixnum_value(r->rlength);
-    // TODO: str with capa
-    argv[5] = mrb_str_new_capa(mrb, r->rlength);
-    memcpy(RSTRING_PTR(argv[5]), r->rdata, r->rlength);
+
+    bytes = mrb_ary_new(mrb);
+    for(int i = 0; i < r->rlength; i ++) 
+        mrb_ary_push(mrb, bytes, mrb_fixnum_value(r->rdata[i]));
+
+    argv[5] =  bytes;
     return mrb_obj_new(mrb, rdata_class, argc, argv);
 }
 
@@ -428,6 +431,7 @@ mrb_dns_rdata_t *mrb_dns_rdata_new(mrb_state *mrb, mrb_dns_name_t *name, uint16_
 
 mrb_dns_rdata_t *mrb_dns_rdata2ctype(mrb_state *mrb, mrb_value obj) {
     mrb_value name, typ, klass, ttl, rlength, rdata;
+    uint8_t *bytes;
     mrb_dns_rdata_t *r = NULL;
     if (mrb_nil_p(obj)) {
         mrb_raise(mrb, E_ARGUMENT_ERROR, "rdata2ctype: nil value");
@@ -461,8 +465,12 @@ mrb_dns_rdata_t *mrb_dns_rdata2ctype(mrb_state *mrb, mrb_value obj) {
         return NULL;
     }
     if ((mrb_nil_p(rdata))) {
-        mrb_raise(mrb, E_RUNTIME_ERROR, "rdata2ctyep: empty rdata.rdata");
+        mrb_raise(mrb, E_RUNTIME_ERROR, "rdata2ctype: empty rdata.rdata");
         return NULL;
+    }
+    if(!mrb_array_p(rdata)){
+        mrb_raise(mrb, E_ARGUMENT_ERROR, "rdata2ctype: expected Array of Fixnum as bytes");
+
     }
 
     r = (mrb_dns_rdata_t *)mrb_malloc(mrb, sizeof(mrb_dns_rdata_t));
@@ -475,8 +483,13 @@ mrb_dns_rdata_t *mrb_dns_rdata2ctype(mrb_state *mrb, mrb_value obj) {
     r->klass   = mrb_fixnum(klass);
     r->ttl     = mrb_fixnum(ttl);
     r->rlength = mrb_fixnum(rlength);
-    // TODO: String with capa
-    r->rdata = (uint8_t *)mrb_str_to_cstr(mrb, rdata);
+    bytes = (uint8_t *)mrb_malloc(mrb, sizeof(uint8_t) * r->rlength);
+    for(int i = 0; i < r->rlength; i++) {
+        mrb_value v;
+        v = mrb_ary_entry(rdata, i);
+        bytes[i] = mrb_fixnum(v);
+    }
+    r->rdata = bytes;
     return r;
 }
 
