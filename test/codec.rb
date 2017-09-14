@@ -23,6 +23,14 @@ end
 
 hdr_query = Resolv::DNS::Query.new(cliheader(0,0,0,0), [], [], [], [])
 
+
+
+##
+##
+## TESTING Resolv::DNS::Codec
+##
+##
+
 c = Resolv::DNS::Codec.new
 
 assert("Resolv::DNS::Codec#encode Header") do
@@ -44,7 +52,7 @@ assert("Resolv::DNS::Codec#encode") do
          0 |  # Z
          Resolv::DNS::Query::Header::RCODE::NoError)
 
-  res = [0x00, 0x42,  # Id
+  expected = [0x00, 0x42,  # Id
          w1,
          w2,
          0x00, 0x00, # QDCOUNT
@@ -52,29 +60,36 @@ assert("Resolv::DNS::Codec#encode") do
          0x00, 0x00, # NSCOUNT
          0x00, 0x00  # ARCOUNT
   ]
-  assert_equal res, c.encode(query)
+
+  assert_equal expected, c.encode(query)
 end
 
 assert("Resolv::DNS::Codec#decode") do
 end
 
 assert("Resolv::DNS::Codec#encode,decode Header") do
-  query = hdr_query
-  assert_equal query, (c.decode (c.encode query))
+  expected = hdr_query
+  actual = (c.decode (c.encode expected))
+  assert_equal expected.header, actual.header
 end
 
 assert("Resolv::DNS::Codec#encode/decode Header|Question ") do
-  query = Resolv::DNS::Query.new(
+  expected = Resolv::DNS::Query.new(
     cliheader(1,0,0,0),
     [Resolv::DNS::Query::Question.new("google-public-dns-a.google.com.", 1,1)],
     [],
     [],
     [])
-  assert_equal query, (c.decode (c.encode query))
+  actual = (c.decode (c.encode expected))
+  assert_equal expected.header, actual.header
+  assert_equal expected.questions, actual.questions
+  assert_equal expected.answers, actual.answers
+  assert_equal expected.authorities, actual.authorities
+  assert_equal expected.additionals, actual.additionals
 end
 
 assert("Resolv::DNS::Codec#encode/decode Header|Answer ") do
-  query = Resolv::DNS::Query.new(
+  expected = Resolv::DNS::Query.new(
     cliheader(0,1,0,0),
     [],
     [Resolv::DNS::Query::Answer.new("google-public-dns-a.google.com.",
@@ -86,17 +101,8 @@ assert("Resolv::DNS::Codec#encode/decode Header|Answer ") do
   ],
    [],
    [])
+  actual = (c.decode (c.encode expected))
+  assert_equal expected.header, actual.header
+  assert_equal expected.answers, actual.answers
 
-  assert_equal query, (c.decode (c.encode query))
 end
-
-assert("Resolv::DNS::Codec#encode/decode Header ") do
-  query = Resolv::DNS::Query.new(
-    cliheader(0,0,0,0),
-    [],
-    [],
-    [],
-    [])
-  assert_equal query, (c.decode (c.encode query))
-end
-
