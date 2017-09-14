@@ -44,7 +44,7 @@ assert("Resolv::DNS::Codec#encode") do
          0 |  # Z
          Resolv::DNS::Query::Header::RCODE::NoError)
 
-  res = [0x42, 00,  # Id
+  res = [0x00, 0x42,  # Id
          w1,
          w2,
          0x00, 0x00, # QDCOUNT
@@ -66,7 +66,7 @@ end
 assert("Resolv::DNS::Codec#encode/decode Header|Question ") do
   query = Resolv::DNS::Query.new(
     cliheader(1,0,0,0),
-      [Resolv::DNS::Query::Question.new("google-public-dns-a.google.com", 1,1)],
+    [Resolv::DNS::Query::Question.new("google-public-dns-a.google.com.", 1,1)],
     [],
     [],
     [])
@@ -77,7 +77,7 @@ assert("Resolv::DNS::Codec#encode/decode Header|Answer ") do
   query = Resolv::DNS::Query.new(
     cliheader(0,1,0,0),
     [],
-      [Resolv::DNS::Query::Answer.new("google-public-dns-a.google.com",
+    [Resolv::DNS::Query::Answer.new("google-public-dns-a.google.com.",
                                     1,
                                     1,
                                     86400,
