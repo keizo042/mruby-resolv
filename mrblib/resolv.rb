@@ -240,6 +240,7 @@ class Resolv
         @qklass = nil
 
         def initialize(qname, qtype, qklass)
+          raise ArgumentError.new, "expected (String, Fixnum, Fixnum)" unless qname.is_a?(String) || qtype.is_a?(Fixnum) || qklass.is_a?(Fixnum)
           @qname = qname
           @qtype = qtype
           @qklass = qklass
