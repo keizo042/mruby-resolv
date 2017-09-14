@@ -8,7 +8,7 @@ assert('Resolv.getaddress') do
 end
 
 assert('Resolv.getname') do
-  assert_equal (Resolv.getname "8.8.8.8"), "google-public-dns-a.google.com")
+  assert_equal (Resolv.getname "8.8.8.8"), "google-public-dns-a.google.com"
 end
 
 r = Resolv.new 
@@ -22,7 +22,7 @@ assert('Resolv#getaddress') do
 end
 
 assert('Resolv#getname') do
-  assert_equal (r.getname "8.8.8.8"), "google-public-dns-a.google.com", 
+  assert_equal (r.getname "8.8.8.8"), "google-public-dns-a.google.com"
 end
 
 
