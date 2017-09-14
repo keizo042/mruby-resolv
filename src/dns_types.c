@@ -85,22 +85,22 @@ mrb_value mrb_dns_ctype2query(mrb_state *mrb, mrb_dns_pkt_t *pkt) {
 
     header = mrb_dns_ctype2header(mrb, pkt->header);
 
-    for (int i = 0; i < pkt->header->qdcount; i++){
-        mrb_value v =mrb_dns_ctype2question(mrb, pkt->questions[i]);
+    for (int i = 0; i < pkt->header->qdcount; i++) {
+        mrb_value v = mrb_dns_ctype2question(mrb, pkt->questions[i]);
         mrb_ary_push(mrb, questions, v);
     }
 
-    for (int i = 0; i < pkt->header->ancount; i++){
+    for (int i = 0; i < pkt->header->ancount; i++) {
         mrb_value v = mrb_dns_ctype2rdata(mrb, pkt->answers[i]);
         mrb_ary_push(mrb, answers, v);
     }
 
-    for (int i = 0; i < pkt->header->nscount; i++){
+    for (int i = 0; i < pkt->header->nscount; i++) {
         mrb_value v = mrb_dns_ctype2rdata(mrb, pkt->authorities[i]);
         mrb_ary_push(mrb, authorities, v);
     }
 
-    for (int i = 0; i < pkt->header->arcount; i++){
+    for (int i = 0; i < pkt->header->arcount; i++) {
         mrb_value v = mrb_dns_ctype2rdata(mrb, pkt->additionals[i]);
         mrb_ary_push(mrb, additionals, v);
     }
@@ -139,7 +139,7 @@ mrb_dns_pkt_t *mrb_dns_query2cpkt(mrb_state *mrb, mrb_value q) {
     questions   = mrb_iv_get(mrb, q, mrb_intern_lit(mrb, "@questions"));
     answers     = mrb_iv_get(mrb, q, mrb_intern_lit(mrb, "@answers"));
     authorities = mrb_iv_get(mrb, q, mrb_intern_lit(mrb, "@authorities"));
-    additionals  = mrb_iv_get(mrb, q, mrb_intern_lit(mrb, "@additionals"));
+    additionals = mrb_iv_get(mrb, q, mrb_intern_lit(mrb, "@additionals"));
     if (mrb_nil_p(header) && mrb_nil_p(questions) && mrb_nil_p(answers) && mrb_nil_p(authorities) &&
         mrb_nil_p(additionals)) {
         mrb_raise(mrb, E_RUNTIME_ERROR, "not all iv is present");

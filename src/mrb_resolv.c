@@ -34,7 +34,6 @@ static mrb_value mrb_dns_codec_init(mrb_state *mrb, mrb_value self) { return sel
 
 static mrb_value mrb_dns_codec_decode(mrb_state *mrb, mrb_value self) {
     mrb_value buff;
-    mrb_value query           = mrb_nil_value();
     mrb_dns_get_state *getter = NULL;
     mrb_dns_pkt_t *pkt        = NULL;
     uint8_t *b                = NULL;
@@ -113,7 +112,7 @@ static mrb_value mrb_dns_codec_encode(mrb_state *mrb, mrb_value self) {
 
     b     = mrb_dns_codec_put_result(mrb, putter);
     bytes = mrb_ary_new(mrb);
-    for (int i = 0; i < putter->size; i++) 
+    for (int i = 0; i < putter->size; i++)
         mrb_ary_push(mrb, bytes, mrb_fixnum_value(b[i]));
 
     mrb_dns_codec_put_close(mrb, putter);
