@@ -474,10 +474,6 @@ mrb_dns_rdata_t *mrb_dns_rdata2ctype(mrb_state *mrb, mrb_value obj) {
     }
 
     r = (mrb_dns_rdata_t *)mrb_malloc(mrb, sizeof(mrb_dns_rdata_t));
-    if (!r) {
-        mrb_raise(mrb, E_RUNTIME_ERROR, "memory error");
-        return NULL;
-    }
     r->name    = mrb_cstr2dns_name(mrb, RSTRING_PTR(name));
     r->typ     = mrb_fixnum(typ);
     r->klass   = mrb_fixnum(klass);
