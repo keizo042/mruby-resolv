@@ -344,7 +344,7 @@ int mrb_dns_codec_get_uint32be(mrb_state *mrb, mrb_dns_get_state *getter, uint32
         if (mrb_dns_codec_get_uint8(mrb, getter, &ws[i]))
             return -1;
     }
-    ret = (w[0] << 24) | (w[1] << 16) | (w[2] << 8) | w[3];
+    ret = (ws[0] << 24) | (ws[1] << 16) | (ws[2] << 8) | ws[3];
     *w  = ret;
     return 0;
 }
