@@ -318,7 +318,7 @@ int mrb_dns_codec_get_uint16be(mrb_state *mrb, mrb_dns_get_state *getter, uint16
     if (mrb_dns_codec_get_uint8(mrb, getter, &w2)) {
         return -1;
     }
-    ret = w1 << 8 | w2;
+    ret = (w1 << 8) | w2;
     *w  = ret;
     return 0;
 }
@@ -410,7 +410,7 @@ mrb_dns_header_t *mrb_dns_codec_get_header(mrb_state *mrb, mrb_dns_get_state *ge
     return hdr;
 }
 
-static int mrb_dns_name_append(mrb_state *mrb, mrb_dns_name_t *name, char *node, size_t len) {
+static int mrb_dns_name_append(mrb_state *mrb, mrb_dns_name_t *name, const char *node, size_t len) {
     char *buff = NULL;
     size_t l   = 0;
     if (!name) {
@@ -421,7 +421,7 @@ static int mrb_dns_name_append(mrb_state *mrb, mrb_dns_name_t *name, char *node,
         mrb_raise(mrb, E_ARGUMENT_ERROR, "mrb_dns_name_append: empty node");
         return -1;
     }
-    if (!name->name) {
+    if (name->name == 0){
         l    = len;
         buff = (char *)mrb_malloc(mrb, sizeof(char) * len);
 
@@ -442,6 +442,21 @@ static int mrb_dns_name_append(mrb_state *mrb, mrb_dns_name_t *name, char *node,
     return 0;
 }
 
+mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter) ;
+mrb_dns_name_t *mrb_dns_codec_get_name_by_offset(mrb_state *mrb, mrb_dns_get_state *getter, uint16_t len) ;
+
+mrb_dns_name_t *mrb_dns_codec_get_name_by_offset(mrb_state *mrb, mrb_dns_get_state *getter, uint16_t offset) {
+    mrb_dns_name_t *name = NULL;
+    uint64_t saved_pos = getter->pos;
+    getter->pos = offset;
+    name = mrb_dns_codec_get_name(mrb, getter);
+    if(!name)
+        mrb_raise(mrb, E_RUNTIME_ERROR,"mrb_dns_codec_get_name_by_offset");
+
+    getter->pos = saved_pos;
+    return name;
+}
+
 mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter) {
     mrb_dns_name_t *name = NULL;
     uint8_t len          = 0;
@@ -453,10 +468,18 @@ mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter
     for (mrb_dns_codec_get_uint8(mrb, getter, &len); len > 0;
          mrb_dns_codec_get_uint8(mrb, getter, &len)) {
         char *node = NULL;
-        if (0xc0 & len == 0xc0) {
-            // TODO: implement compression
-            mrb_raise(mrb, E_NOTIMP_ERROR, "mrb_dns_codec_get_name: compression");
-            break;
+        if ((0xc0 & len) == 0xc0) {
+            uint8_t w = 0;
+            uint16_t offset = 0;
+            mrb_dns_name_t *n = NULL;
+            if(mrb_dns_codec_get_uint8(mrb, getter, &w))
+                return NULL;
+            offset = ((0x3f & len) << 8) | w;
+            n = mrb_dns_codec_get_name_by_offset(mrb, getter, offset);
+            if(!n)
+                mrb_raise(mrb, E_RUNTIME_ERROR, "mrb_dns_codec_get_name");
+            mrb_dns_name_append(mrb, name, n->name, n->len);
+            return name;
         }
         node = mrb_dns_codec_get_str(mrb, getter, len);
         if (!node) {
