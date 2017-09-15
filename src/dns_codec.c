@@ -421,7 +421,7 @@ static int mrb_dns_name_append(mrb_state *mrb, mrb_dns_name_t *name, const char 
         mrb_raise(mrb, E_ARGUMENT_ERROR, "mrb_dns_name_append: empty node");
         return -1;
     }
-    if (name->name == 0){
+    if (name->len == 0){
         l    = len;
         buff = (char *)mrb_malloc(mrb, sizeof(char) * len);
 
