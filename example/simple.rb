@@ -18,6 +18,6 @@ q = Resolv::DNS::Query.new(
     [])
 
 dns = Resolv::DNS.new
-dns.send(q)
+dns.send(q, "8.8.8.8")
 ret = dns.recv
 # ret is a `Reolv::DNS::Query` as DNS Response, as you want
