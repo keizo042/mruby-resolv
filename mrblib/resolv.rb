@@ -1,5 +1,6 @@
 # TOP LEVEL NAMESPACE
 class Resolv
+  class ResolvError < StandardError; end
   class << self
     def getaddress(name)
       raise NotImplementedError
@@ -50,8 +51,12 @@ class Resolv
     raise NotImplementedError
   end
 
+
   # DNS resolver
   class DNS
+    class DecodeError < StandardError; end
+    class EncodeError < StandardError; end
+
     def initialize(af = Socket::AF_INET)
       @maxlen = 1280
       @socket =  UDPSocket.new af
@@ -84,7 +89,11 @@ class Resolv
     def send(query, host, port = 53)
       raise ArgumentError, "expected #{Resolv::DNS::Query}" unless query.is_a?(Resolv::DNS::Query)
       raise ArgumentError, "expected hostname" if host.nil?
+      begin
       payload = Resolv::DNS::Codec.new.encode(query).pack("c*")
+      rescue => e
+        raise Resolv::DNS::EncodeError.new(e)
+      end
       @socket.connect host, port
       @socket.send payload, 0
     end
@@ -92,7 +101,12 @@ class Resolv
     def recv( maxlen = nil)
        len =(maxlen.nil? ? @maxlen : maxlen)
        payload = @socket.recv len
-       DNS::Resolv::Codec.new.decode payload[0].unpack("c*");
+       begin
+       Resolv::DNS::Codec.new.decode payload.unpack("c*");
+       rescue => e
+         Resolv::DNS::DecodeError.new(e)
+
+       end
     end
 
     class IPv4
@@ -350,5 +364,6 @@ class Resolv
         end
       end
     end
+
   end
 end
