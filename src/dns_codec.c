@@ -76,6 +76,19 @@ int mrb_dns_codec_put_uint16be(mrb_state *mrb, mrb_dns_put_state *putter, uint16
     return 0;
 }
 
+int mrb_dns_codec_put_uint32be(mrb_state *mrb, mrb_dns_put_state *putter, uint32_t w) {
+    uint8_t ws[4];
+    ws[0] = (0xff000000 & w);
+    ws[1] = (0x00ff0000 & w);
+    ws[2] = (0x0000ff00 & w);
+    ws[3] = (0x000000ff & w);
+    for (int i = 0; i < 4; i++) {
+        if(mrb_dns_codec_put(mrb, putter, ws[i]))
+                return -1;
+    }
+    return 0;
+}
+
 /**
  * put bytes
  */
@@ -202,7 +215,7 @@ int mrb_dns_codec_put_rdata(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_r
         return -1;
     if (mrb_dns_codec_put_uint16be(mrb, putter, rdata->klass))
         return -1;
-    if (mrb_dns_codec_put_uint16be(mrb, putter, rdata->ttl))
+    if (mrb_dns_codec_put_uint32be(mrb, putter, rdata->ttl))
         return -1;
     if (mrb_dns_codec_put_uint16be(mrb, putter, rdata->rlength))
         return -1;
@@ -319,6 +332,18 @@ int mrb_dns_codec_get_uint16be(mrb_state *mrb, mrb_dns_get_state *getter, uint16
         return -1;
     }
     ret = w1 << 8 | w2;
+    *w  = ret;
+    return 0;
+}
+
+int mrb_dns_codec_get_uint32be(mrb_state *mrb, mrb_dns_get_state *getter, uint32_t *w) {
+    uint32_t ret = 0;
+    uint8_t ws[4];
+    for (int i = 0; i < 4; i++) {
+        if (mrb_dns_codec_get_uint8(mrb, getter, &ws[i]))
+            return -1;
+    }
+    ret = (w[0] << 24) | (w[1] << 16) | (w[2] << 8) | w[3];
     *w  = ret;
     return 0;
 }
@@ -504,7 +529,7 @@ mrb_dns_rdata_t *mrb_dns_codec_get_rdata(mrb_state *mrb, mrb_dns_get_state *gett
     if (mrb_dns_codec_get_uint16be(mrb, getter, &rdata->klass)) {
         return NULL;
     }
-    if (mrb_dns_codec_get_uint16be(mrb, getter, &rdata->ttl)) {
+    if (mrb_dns_codec_get_uint32be(mrb, getter, &rdata->ttl)) {
         return NULL;
     }
     if (mrb_dns_codec_get_uint16be(mrb, getter, &rdata->rlength)) {

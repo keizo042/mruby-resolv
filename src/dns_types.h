@@ -37,7 +37,7 @@ typedef struct mrb_dns_rdata_s {
     mrb_dns_name_t *name;
     uint16_t typ;
     uint16_t klass;
-    uint16_t ttl;
+    uint32_t ttl;
     uint16_t rlength;
     uint8_t *rdata;
 } mrb_dns_rdata_t;
