@@ -52,6 +52,11 @@ class Resolv
 
   # DNS resolver
   class DNS
+    def initialize(af = Socket::AF_INET)
+      @maxlen = 1280
+      @socket =  UDPSocket.new af
+      @port = 53
+    end
 
     def getresources(name, typ)
       raise NotImplementedError
@@ -77,18 +82,20 @@ class Resolv
       raise NotImplementedError
     end
 
-    def open
+    def send(query, host)
+      raise ArgumentError, "expected #{Resolv::DNS::Query}" unless query.is_a?(Resolv::DNS::Query)
+      raise ArgumentError, "expected hostname" if host.nil?
+      payload = DNS::Reolv::Codec.new.encode(query).each { |i| i.chr }.join
+      @socket.send payload, host, @port
     end
 
-    def send(pkt)
-    end
-
-    def recv
+    def recv( maxlen = nil)
+       payload = @socket.recv (maxlen.nil? ? @maxlen : maxlen)
+       DNS::Resolv::Codec.new.decode payload[0].to_bytes
     end
 
     class IPv4
       @octets = []
-
       def initialize(ip)
       end
     end
@@ -199,14 +206,12 @@ class Resolv
           @arcount = arcount
         end
 
-        def == (rval)
+        def ==(rval)
           self.id  == rval.id && self.qr == rval.qr && self.opcode == rval.opcode && self.aa == rval.aa &&
-            self.tc == rval.tc && self.rd == rval.rd && self.ra == rval.ra && self.rcode == rval.rcode &&
+            self.tc == rval.tc && self.rd == rval.rd && self.ra == rval.ra && self.rcode == rval.rcode 
             self.qdcount == rval.qdcount && self.ancount == rval.ancount && self.arcount == rval.arcount
-
         end
       end
-
 
       class RData
         attr_reader :name, :typ, :klass, :ttl, :rlength
@@ -215,7 +220,7 @@ class Resolv
         @klass = 0
         @ttl = 0
         @rlength = 0
-        @rdata = nil
+        @rdata = []
 
         def initialize(name, typ, klass, ttl, rlength, rdata)
           @name = name
@@ -226,6 +231,7 @@ class Resolv
           # TODO:  accepting Fixnum
           @rdata = rdata
         end
+      end
 
         def ==(rval)
           self.name == rval.name && 
@@ -239,7 +245,6 @@ class Resolv
         def rdata
           rdata.bytes.slice(0, self.rlength - 1) 
         end
-      end
 
       class Question
         attr_reader :qname, :qtype, :qklass
@@ -253,6 +258,7 @@ class Resolv
           @qtype = qtype
           @qklass = qklass
         end
+
         def ==(rval)
           self.qname == rval.qname &&
             self.qtype == rval.qtype &&
@@ -263,18 +269,16 @@ class Resolv
       class Answer < Resolv::DNS::Query::RData; end
       class Authority < Resolv::DNS::Query::RData; end
       class Addtional < Resolv::DNS::Query::RData; end
-
     end
 
     class DomainName
-      @data = nil
-
-      def initialize(name)
-        @data = name
+      attr_reader :name
+      def initialize(name = "")
+        @name = name
       end
 
       def encode
-        @data
+         @name.split(".").each { |node| node.size.chr + node }.join("")
       end
     end
 
@@ -285,8 +289,10 @@ class Resolv
     class MX; end
     class PTR; end
     class ANY; end
+    class SOA; end
     class MX; end
 
+    # Resource class indicate DNS Resource Record
     class Resource
       @rtype = 0
 
@@ -298,25 +304,30 @@ class Resolv
         @rtype = 1
       end
 
-      class MX
+      class MX < Resolv::DNS::Resource
         @rtype = 15
       end
 
-      class NS
+      class NS < Resolv::DNS::Resource
+        @rtype = 2
       end
 
-      class AAAA
+      class AAAA < Resolv::DNS::Resource
+        @rtype = 25 
       end
 
-      class PTR
+      class PTR < Resolv::DNS::Resource
+        @rtype = 12
       end
 
-      class ANY
+      class ANY < Resolv::DNS::Resource
+        @rtype = 255
       end
+
 
       # CLASS INTERNET module
       module IN
-        @rklass = 1
+        @rklass = 1 
         class A < Resolv::DNS::A
           include Resolv::DNS::Resource::IN
         end
