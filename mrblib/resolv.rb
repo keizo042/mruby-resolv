@@ -55,7 +55,6 @@ class Resolv
     def initialize(af = Socket::AF_INET)
       @maxlen = 1280
       @socket =  UDPSocket.new af
-      @port = 53
     end
 
     def getresources(name, typ)
@@ -82,11 +81,11 @@ class Resolv
       raise NotImplementedError
     end
 
-    def send(query, host)
+    def send(query, host, port = 53)
       raise ArgumentError, "expected #{Resolv::DNS::Query}" unless query.is_a?(Resolv::DNS::Query)
       raise ArgumentError, "expected hostname" if host.nil?
       payload = Resolv::DNS::Codec.new.encode(query).pack("c*")
-      @socket.connect host, @port
+      @socket.connect host, port
       @socket.send payload, 0
     end
 
