@@ -83,7 +83,7 @@ int mrb_dns_codec_put_uint32be(mrb_state *mrb, mrb_dns_put_state *putter, uint32
     ws[2] = (0x0000ff00 & w);
     ws[3] = (0x000000ff & w);
     for (int i = 0; i < 4; i++) {
-        if(mrb_dns_codec_put(mrb, putter, ws[i]))
+        if(mrb_dns_codec_put_uint8(mrb, putter, ws[i]))
                 return -1;
     }
     return 0;
