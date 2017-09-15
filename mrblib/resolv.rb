@@ -85,12 +85,14 @@ class Resolv
     def send(query, host)
       raise ArgumentError, "expected #{Resolv::DNS::Query}" unless query.is_a?(Resolv::DNS::Query)
       raise ArgumentError, "expected hostname" if host.nil?
-      payload = DNS::Reolv::Codec.new.encode(query).each { |i| i.chr }.join
-      @socket.send payload, host, @port
+      payload = Resolv::DNS::Codec.new.encode(query).pack("c*")
+      @socket.connect host, @port
+      @socket.send payload, 0
     end
 
     def recv( maxlen = nil)
-       payload = @socket.recv (maxlen.nil? ? @maxlen : maxlen)
+       len =(maxlen.nil? ? @maxlen : maxlen)
+       payload = @socket.recv len
        DNS::Resolv::Codec.new.decode payload[0].to_bytes
     end
 
