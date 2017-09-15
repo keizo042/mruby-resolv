@@ -1,15 +1,47 @@
-mruby-resolv
+mruby-resolv(v0.1.0)
 ====
 
 ## Descriotion
 
+DNS low level implementation
+
+there are only Resolv::DNS#send & Resolv::DNS#recv work well.
+
+### Resolv::DNS#new(af)
+in default, `af` is `Socket::AF_INET`
+
+### Resolv::DNS#send(query, host, port = 53) 
+@param query is a `Resolv::DNS::Query`.  
+@param host is a `String` as hostname.  
+
+## Resolv::DNS#recv
+@return DNS::Resolv::Query
+
+## Resolv::DNS::Query
+
+DNS query representation
+### instance variable
+
+- @header 
+- @questions
+- @answers
+- @authorities
+- @additionals
+
+now, you should obtain data by yourself.
+
+
+### goal
+
 mruby-resolv is Ruby Resolv class implementation for mruby.
+API is same Ruby Resolv,
+and also mruby-ldns, mruby-knot.
+
+#### notes
 if you use mruby on application embeded use,
 I recommend to use mruby-ldns mrbgem.
 ldns is secure, well-maintaned, simple C-library.
-I make mruby wrapper as Resolv class.
-API is same Ruby Resolv,
-and also mruby-ldns, mruby-knot.
+I make ldns mruby wrapper as Resolv class.
 
 
 ## sample
