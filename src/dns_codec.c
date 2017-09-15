@@ -77,14 +77,15 @@ int mrb_dns_codec_put_uint16be(mrb_state *mrb, mrb_dns_put_state *putter, uint16
 }
 
 int mrb_dns_codec_put_uint32be(mrb_state *mrb, mrb_dns_put_state *putter, uint32_t w) {
-    uint8_t ws[4];
-    ws[0] = (0xff000000 & w);
-    ws[1] = (0x00ff0000 & w);
-    ws[2] = (0x0000ff00 & w);
+    uint8_t ws[4] = {};
+
+    ws[0] = (0xff000000 & w) >> 24;
+    ws[1] = (0x00ff0000 & w) >> 16;
+    ws[2] = (0x0000ff00 & w) >> 8;
     ws[3] = (0x000000ff & w);
     for (int i = 0; i < 4; i++) {
-        if(mrb_dns_codec_put_uint8(mrb, putter, ws[i]))
-                return -1;
+        if (mrb_dns_codec_put_uint8(mrb, putter, ws[i]))
+            return -1;
     }
     return 0;
 }
@@ -337,8 +338,8 @@ int mrb_dns_codec_get_uint16be(mrb_state *mrb, mrb_dns_get_state *getter, uint16
 }
 
 int mrb_dns_codec_get_uint32be(mrb_state *mrb, mrb_dns_get_state *getter, uint32_t *w) {
-    uint32_t ret = 0;
-    uint8_t ws[4];
+    uint32_t ret  = 0;
+    uint8_t ws[4] = {};
     for (int i = 0; i < 4; i++) {
         if (mrb_dns_codec_get_uint8(mrb, getter, &ws[i]))
             return -1;
