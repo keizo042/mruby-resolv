@@ -104,8 +104,7 @@ class Resolv
        begin
        Resolv::DNS::Codec.new.decode payload.unpack("c*");
        rescue => e
-         Resolv::DNS::DecodeError.new(e)
-
+         raise Resolv::DNS::DecodeError.new(e)
        end
     end
 
