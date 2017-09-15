@@ -269,7 +269,7 @@ uint8_t *mrb_dns_codec_put_result(mrb_state *mrb, mrb_dns_put_state *putter) {
     return putter->buff;
 }
 
-/**
+    /**
  *  Get
  **/
 
@@ -483,15 +483,18 @@ mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter
         }
         node = mrb_dns_codec_get_str(mrb, getter, len);
         if (!node) {
+            mrb_free(mrb, name);
             mrb_raise(mrb, E_RUNTIME_ERROR, "");
             return NULL;
         }
         if (mrb_dns_name_append(mrb, name, node, len)) {
+            mrb_free(mrb, name);
             mrb_raise(mrb, E_RUNTIME_ERROR, "");
             return NULL;
         }
     }
     if (mrb_dns_name_append(mrb, name, "\0", 1)) {
+        mrb_free(mrb, name);
         return NULL;
     }
     return name;
