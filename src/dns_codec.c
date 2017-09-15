@@ -445,7 +445,6 @@ static int mrb_dns_name_append(mrb_state *mrb, mrb_dns_name_t *name, char *node,
 mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter) {
     mrb_dns_name_t *name = NULL;
     uint8_t len          = 0;
-    // TODO: compression-aware
 
     name       = (mrb_dns_name_t *)mrb_malloc(mrb, sizeof(mrb_dns_name_t));
     name->name = NULL;
@@ -454,7 +453,7 @@ mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter
     for (mrb_dns_codec_get_uint8(mrb, getter, &len); len > 0;
          mrb_dns_codec_get_uint8(mrb, getter, &len)) {
         char *node = NULL;
-        if (0xC0 & len) {
+        if (0xc0 & len == 0xc0) {
             // TODO: implement compression
             mrb_raise(mrb, E_NOTIMP_ERROR, "mrb_dns_codec_get_name: compression");
             break;
