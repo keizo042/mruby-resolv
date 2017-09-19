@@ -49,9 +49,6 @@ class Resolv
 	    c.const_set(:ClassValue, ClassValue)
 	    ClassHash[[s::TypeValue, ClassValue]] = c
 	    self.const_set(s.name.sub(/.*::/, ''), c)
-        }
-
-
         end
 
         #

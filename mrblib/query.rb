@@ -159,6 +159,57 @@ class Resolv
           # TODO:  accepting Fixnum
           @rdata = rdata
         end
+
+        def parse
+          case @typ
+            # internet
+          when Resource::IN::A::TypeValue
+            return self.a
+          when Resource::IN::AAAA::TypeValue
+            return self.aaaa
+          when Resource::IN::SRV::TypeValue
+            return self.srv
+            # common
+          when Resource::MX::TypeValue
+            return self.mx
+          when Resource::NS::TypeValue
+            return self.ns
+          when Resource::TXT::TypeValue
+            return self.txt
+          when Resource::OPT::TypeValue
+            return self.opt
+          when Resource::ANY::TypeValue
+            return self.any
+          else
+            raise RuntimeError, "unknown resource type"
+          end
+        end
+
+        def a
+        end
+
+        def aaaa
+        end
+
+        def mx
+        end
+
+        def ns
+        end
+
+        def ptr
+        end
+
+        def txt
+        end
+
+        def opt
+        end
+
+        def srv
+        end
+        def any
+        end
       end
 
         def ==(rval)
