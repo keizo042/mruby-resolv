@@ -296,16 +296,6 @@ class Resolv
       end
     end
 
-
-    class A ; end
-    class AAAA; end
-    class NS; end
-    class MX; end
-    class PTR; end
-    class ANY; end
-    class SOA; end
-    class MX; end
-
     # Resource class indicate DNS Resource Record
     class Resource
       @rtype = 0
@@ -314,55 +304,34 @@ class Resolv
       # DNS RR abstract "type" classes
       # 
 
-      class A < Resolv::DNS::Resource
-        @rtype = 1
-      end
-
       class MX < Resolv::DNS::Resource
-        @rtype = 15
+        TypeValue = 15
       end
 
       class NS < Resolv::DNS::Resource
-        @rtype = 2
-      end
-
-      class AAAA < Resolv::DNS::Resource
-        @rtype = 25 
+        TypeValue = 2
       end
 
       class PTR < Resolv::DNS::Resource
-        @rtype = 12
+        TypeValue = 12
       end
 
       class ANY < Resolv::DNS::Resource
-        @rtype = 255
+        TypeValue = 255
       end
-
 
       # CLASS INTERNET module
       module IN
-        @rklass = 1 
-        class A < Resolv::DNS::A
-          include Resolv::DNS::Resource::IN
+        ClassValue = 1
+        class A < Resolv::DNS::Resource
+          TypeValue = 1
+          ClassValue = IN::ClassValue
         end
-
-        class MX < Resolv::DNS::MX
-          include Resolv::DNS::Resource::IN
-        end
-
-        class NS < Resolv::DNS::NS
-          include Resolv::DNS::Resource::IN
-        end
-
-        class AAAA < Resolv::DNS::AAAA
-          include Resolv::DNS::Resource::IN
-        end
-
-        class ANY < Resolv::DNS::ANY
-          include Resolv::DNS::Resource::IN
+        class AAAA < Resolv::DNS::Resource
+          TypeValue = 28
+          ClassValue = IN::ClassValue
         end
       end
     end
-
   end
 end
