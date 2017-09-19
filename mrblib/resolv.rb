@@ -108,25 +108,22 @@ class Resolv
        end
     end
 
-    class IPv4
-      @octets = []
-      def initialize(ip)
+    class Name
+      def self.create(name)
+        raise NotImplementedError
       end
-    end
 
-    class IPv6
-      @octets = []
+      def initialize(name)
+        raise NotImplementedError
+      end
+      def absolute?
+        raise NotImplementedError
+      end 
+      def subdomian_of?
+        raise NotImplementedError
+      end
       def to_s
-      end
-
-      def string2octets ip
-      end
-
-      def int2octets ip
-      end
-      
-      def initialize(ip)
-        return nil unless ip.is_a?(String) or ip.is_a?(Integer) or ip.is_a?(Resolv::DNS::IPv6)
+        raise NotImplementedError
       end
     end
 
