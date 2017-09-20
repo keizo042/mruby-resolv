@@ -52,11 +52,15 @@ static mrb_value mrb_dns_ctype2question(mrb_state *mrb, mrb_dns_question_t *q) {
     return mrb_obj_new(mrb, question_class, argc, argv);
 }
 
-mrb_value mrb_dns_ctype2rdata(mrb_state *mrb, mrb_dns_rdata_t *r) {
+mrb_value mrb_dns_ctype2rdata(mrb_state *mrb, mrb_dns_rdata_t *rd) {
     struct RClass *rdata_class = NULL;
     mrb_value bytes, *argv            = NULL;
+    mrb_dns_record_t *r = NULL;
     const mrb_int argc         = 6;
-    mrb_assert(r != NULL);
+    mrb_assert(rd != NULL);
+    mrb_assert(rd->typ == 0);
+    r = rd->data.record;
+
     rdata_class = MRB_SECTION_CLASS_GET(mrb, "RData");
 
     argv    = mrb_malloc(mrb, sizeof(mrb_value) * argc);
@@ -411,28 +415,11 @@ mrb_dns_question_t *mrb_dns_question2ctype(mrb_state *mrb, mrb_value obj) {
     return q;
 }
 
-mrb_dns_rdata_t *mrb_dns_rdata_new(mrb_state *mrb, mrb_dns_name_t *name, uint16_t typ,
-                                   uint16_t klass, uint16_t rlength, uint8_t *rdata) {
-    mrb_dns_rdata_t *r = NULL;
-    if (!mrb)
-        return NULL;
-    r = (mrb_dns_rdata_t *)mrb_malloc(mrb, sizeof(mrb_dns_rdata_t));
-    if (!r)
-        return NULL;
-
-    r->name    = name;
-    r->typ     = typ;
-    r->klass   = klass;
-    r->rlength = sizeof(rdata) / sizeof(uint8_t);
-    r->rdata   = rdata;
-
-    return r;
-}
-
 mrb_dns_rdata_t *mrb_dns_rdata2ctype(mrb_state *mrb, mrb_value obj) {
     mrb_value name, typ, klass, ttl, rlength, rdata;
     uint8_t *bytes;
-    mrb_dns_rdata_t *r = NULL;
+    mrb_dns_rdata_t *rd;
+    mrb_dns_record_t *r = NULL;
     if (mrb_nil_p(obj)) {
         mrb_raise(mrb, E_ARGUMENT_ERROR, "rdata2ctype: nil value");
         return NULL;
@@ -473,7 +460,9 @@ mrb_dns_rdata_t *mrb_dns_rdata2ctype(mrb_state *mrb, mrb_value obj) {
 
     }
 
-    r = (mrb_dns_rdata_t *)mrb_malloc(mrb, sizeof(mrb_dns_rdata_t));
+    rd = (mrb_dns_rdata_t *)mrb_malloc(mrb, sizeof(mrb_dns_rdata_t));
+    r = (mrb_dns_record_t *)mrb_malloc(mrb, sizeof(mrb_dns_record_t));
+    rd->data.record = r;
     r->name    = mrb_cstr2dns_name(mrb, RSTRING_PTR(name));
     r->typ     = mrb_fixnum(typ);
     r->klass   = mrb_fixnum(klass);
@@ -486,7 +475,7 @@ mrb_dns_rdata_t *mrb_dns_rdata2ctype(mrb_state *mrb, mrb_value obj) {
         bytes[i] = mrb_fixnum(v);
     }
     r->rdata = bytes;
-    return r;
+    return rd;
 }
 
 
