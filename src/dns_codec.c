@@ -114,17 +114,12 @@ int mrb_dns_codec_put_str(mrb_state *mrb, mrb_dns_put_state *putter, char *buff,
  **/
 
 
-int mrb_dns_codec_put_name(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_name_t *name) {
+int mrb_dns_codec_put_name(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_name_t *name, uint8_t flag) {
     char *tok = NULL;
     int len   = 0;
 
-    if (!name) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "mrb_dns_codec_put_name: null pointer");
-        return -1;
-    }
-    if (!name->name) {
-        mrb_raise(mrb, E_RUNTIME_ERROR, "QUESTION(NAME) failure");
-        return -1;
+    if((0x40 & flag) == 0x50){
+        return mrb_dns_codec_put_uint8(mrb, putter, flag);
     }
     tok = strtok(name->name, ".");
     if (tok) {
@@ -193,7 +188,7 @@ int mrb_dns_codec_put_question(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dn
         mrb_raise(mrb, E_ARGUMENT_ERROR, "mrb_dns_codec_put_question: null pointer");
         return -1;
     }
-    if (mrb_dns_codec_put_name(mrb, putter, q->qname)) {
+    if (mrb_dns_codec_put_name(mrb, putter, q->qname, 0)) {
         mrb_raise(mrb, E_RUNTIME_ERROR, "QUESTION(NAME) put failure");
         return -1;
     }
@@ -209,8 +204,9 @@ int mrb_dns_codec_put_question(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dn
 }
 
 int mrb_dns_codec_put_rdata(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_rdata_t *rdata) {
+    uint8_t flag = 0;
     mrb_assert(rdata != NULL);
-    if (mrb_dns_codec_put_name(mrb, putter, rdata->name))
+    if (mrb_dns_codec_put_name(mrb, putter, rdata->name, flag))
         return -1;
     if (mrb_dns_codec_put_uint16be(mrb, putter, rdata->typ))
         return -1;
