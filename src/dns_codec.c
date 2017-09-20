@@ -110,12 +110,12 @@ int mrb_dns_codec_put_str(mrb_state *mrb, mrb_dns_put_state *putter, char *buff,
  **/
 
 
-int mrb_dns_codec_put_name(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_name_t *name, uint8_t flag) {
+int mrb_dns_codec_put_name(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_name_t *name,
+                           uint8_t flag) {
     char *tok = NULL;
     int len   = 0;
-    if((0x40 & flag) == 0x50){
+    if ((0x40 & flag) == 0x40)
         return mrb_dns_codec_put_uint8(mrb, putter, flag);
-    }
     tok = strtok(name->name, ".");
     if (tok) {
         // TODO: remove strtok for thread-aware
@@ -200,9 +200,9 @@ int mrb_dns_codec_put_question(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dn
 
 int mrb_dns_codec_put_rdata(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_rdata_t *r) {
     mrb_dns_record_t *rdata = r->data.record;
-    uint8_t flag = 0;
+    uint8_t flag;
     mrb_assert(r != NULL);
-
+    flag = r->typ ? 0x40 : 0;
     if (mrb_dns_codec_put_name(mrb, putter, rdata->name, flag))
         return -1;
     if (mrb_dns_codec_put_uint16be(mrb, putter, rdata->typ))
