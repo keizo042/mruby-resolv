@@ -113,7 +113,6 @@ int mrb_dns_codec_put_str(mrb_state *mrb, mrb_dns_put_state *putter, char *buff,
 int mrb_dns_codec_put_name(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_name_t *name, uint8_t flag) {
     char *tok = NULL;
     int len   = 0;
-
     if((0x40 & flag) == 0x50){
         return mrb_dns_codec_put_uint8(mrb, putter, flag);
     }
