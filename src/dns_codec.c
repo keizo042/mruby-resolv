@@ -6,10 +6,6 @@
   *
   **/
 
-#if __linux__ == 0
-#error "archtecture other than linux is not supported"
-#endif
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
