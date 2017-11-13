@@ -67,7 +67,7 @@ add github path to build_config.rb
 2 clause BSD L
 ## AUTHOR
 
-[keizo](https://github.com/keizo042]
+[keizo](https://github.com/keizo042)
 
 
 ## Contact us
