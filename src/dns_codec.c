@@ -110,13 +110,12 @@ int mrb_dns_codec_put_str(mrb_state *mrb, mrb_dns_put_state *putter, char *buff,
  **/
 
 
-int mrb_dns_codec_put_name(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_name_t *name, uint8_t flag) {
+int mrb_dns_codec_put_name(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_name_t *name,
+                           uint8_t flag) {
     char *tok = NULL;
     int len   = 0;
-
-    if((0x40 & flag) == 0x50){
+    if ((0x40 & flag) == 0x40)
         return mrb_dns_codec_put_uint8(mrb, putter, flag);
-    }
     tok = strtok(name->name, ".");
     if (tok) {
         // TODO: remove strtok for thread-aware
@@ -199,9 +198,11 @@ int mrb_dns_codec_put_question(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dn
     return 0;
 }
 
-int mrb_dns_codec_put_rdata(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_rdata_t *rdata) {
-    uint8_t flag = 0;
-    mrb_assert(rdata != NULL);
+int mrb_dns_codec_put_rdata(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_rdata_t *r) {
+    mrb_dns_record_t *rdata = r->data.record;
+    uint8_t flag;
+    mrb_assert(r != NULL);
+    flag = r->typ ? 0x40 : 0;
     if (mrb_dns_codec_put_name(mrb, putter, rdata->name, flag))
         return -1;
     if (mrb_dns_codec_put_uint16be(mrb, putter, rdata->typ))
@@ -275,9 +276,9 @@ uint8_t *mrb_dns_codec_put_result(mrb_state *mrb, mrb_dns_put_state *putter) {
     return putter->buff;
 }
 
-    /**
- *  Get
- **/
+/**
+*  Get
+**/
 
 mrb_dns_get_state *mrb_dns_codec_get_open(mrb_state *mrb, uint8_t *buff, size_t len) {
     mrb_dns_get_state *state = (mrb_dns_get_state *)mrb_malloc(mrb, sizeof(mrb_dns_get_state));
@@ -439,7 +440,7 @@ static int mrb_dns_name_append(mrb_state *mrb, mrb_dns_name_t *name, const char 
         mrb_raise(mrb, E_ARGUMENT_ERROR, "mrb_dns_name_append: empty node");
         return -1;
     }
-    if (name->len == 0){
+    if (name->len == 0) {
         l    = len;
         buff = (char *)mrb_malloc(mrb, sizeof(char) * len);
 
@@ -460,16 +461,18 @@ static int mrb_dns_name_append(mrb_state *mrb, mrb_dns_name_t *name, const char 
     return 0;
 }
 
-mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter) ;
-mrb_dns_name_t *mrb_dns_codec_get_name_by_offset(mrb_state *mrb, mrb_dns_get_state *getter, uint16_t len) ;
+mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter);
+mrb_dns_name_t *mrb_dns_codec_get_name_by_offset(mrb_state *mrb, mrb_dns_get_state *getter,
+                                                 uint16_t len);
 
-mrb_dns_name_t *mrb_dns_codec_get_name_by_offset(mrb_state *mrb, mrb_dns_get_state *getter, uint16_t offset) {
+mrb_dns_name_t *mrb_dns_codec_get_name_by_offset(mrb_state *mrb, mrb_dns_get_state *getter,
+                                                 uint16_t offset) {
     mrb_dns_name_t *name = NULL;
-    uint64_t saved_pos = getter->pos;
-    getter->pos = offset;
-    name = mrb_dns_codec_get_name(mrb, getter);
-    if(!name)
-        mrb_raise(mrb, E_RUNTIME_ERROR,"mrb_dns_codec_get_name_by_offset");
+    uint64_t saved_pos   = getter->pos;
+    getter->pos          = offset;
+    name                 = mrb_dns_codec_get_name(mrb, getter);
+    if (!name)
+        mrb_raise(mrb, E_RUNTIME_ERROR, "mrb_dns_codec_get_name_by_offset");
 
     getter->pos = saved_pos;
     return name;
@@ -487,14 +490,14 @@ mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter
          mrb_dns_codec_get_uint8(mrb, getter, &len)) {
         char *node = NULL;
         if ((0xc0 & len) == 0xc0) {
-            uint8_t w = 0;
-            uint16_t offset = 0;
+            uint8_t w         = 0;
+            uint16_t offset   = 0;
             mrb_dns_name_t *n = NULL;
-            if(mrb_dns_codec_get_uint8(mrb, getter, &w))
+            if (mrb_dns_codec_get_uint8(mrb, getter, &w))
                 return NULL;
             offset = ((0x3f & len) << 8) | w;
-            n = mrb_dns_codec_get_name_by_offset(mrb, getter, offset);
-            if(!n)
+            n      = mrb_dns_codec_get_name_by_offset(mrb, getter, offset);
+            if (!n)
                 mrb_raise(mrb, E_RUNTIME_ERROR, "mrb_dns_codec_get_name");
             mrb_dns_name_append(mrb, name, n->name, n->len);
             return name;
@@ -536,25 +539,84 @@ mrb_dns_question_t *mrb_dns_codec_get_question(mrb_state *mrb, mrb_dns_get_state
     return q;
 }
 
-mrb_dns_rdata_t *mrb_dns_codec_get_rdata(mrb_state *mrb, mrb_dns_get_state *getter) {
-    mrb_dns_rdata_t *rdata = (mrb_dns_rdata_t *)malloc(sizeof(mrb_dns_rdata_t));
+static mrb_dns_opt_rdata_t *mrb_dns_codec_get_opt_rdata(mrb_state *mrb, mrb_dns_get_state *getter) {
+    uint8_t ercode = 0, version = 0, *data = NULL;
+    uint16_t typ = 0, mtu = 0, flags = 0, rdlen = 0, optrcode, optlen;
+    mrb_dns_opt_rdata_t *opt = NULL;
 
-    if (!(rdata->name = mrb_dns_codec_get_name(mrb, getter))) {
+    // TODO: remove
+    mrb_raise(mrb, E_NOTIMP_ERROR, "mrb_dns_codec_get_opt_rdata");
+
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &typ))
+        return NULL;
+    // be derivied from class field
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &mtu))
+        return NULL;
+
+    // three of them as below is derivied from  ttl field
+    if (mrb_dns_codec_get_uint8(mrb, getter, &ercode))
+        return NULL;
+    if (mrb_dns_codec_get_uint8(mrb, getter, &version))
+        return NULL;
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &flags))
+        return NULL;
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &rdlen))
+        return NULL;
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &optrcode))
+        return NULL;
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &optlen))
+        return NULL;
+    data = (uint8_t *)mrb_dns_codec_get_str(mrb, getter, optlen);
+    if (!data)
+        return NULL;
+    opt                = (mrb_dns_opt_rdata_t *)mrb_malloc(mrb, sizeof(mrb_dns_opt_rdata_t));
+    opt->name          = (mrb_dns_name_t *)mrb_malloc(mrb, sizeof(mrb_dns_rdata_t));
+    opt->name->name[0] = '\0';
+    opt->name->len     = 0;
+    opt->typ           = 0x29; // 41 Opt Record
+    opt->mtu =  mtu;
+    // opt->ercode =
+    // opt->version =
+    opt->rdlen = rdlen;
+    opt->rdata = data;
+    return opt;
+}
+
+static mrb_dns_record_t *mrb_dns_codec_get_record(mrb_state *mrb, mrb_dns_get_state *getter) {
+    mrb_dns_record_t *record = (mrb_dns_record_t *)mrb_malloc(mrb, sizeof(mrb_dns_record_t));
+    if (!(record->name = mrb_dns_codec_get_name(mrb, getter)))
+        return NULL;
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &record->typ)) {
         return NULL;
     }
-    if (mrb_dns_codec_get_uint16be(mrb, getter, &rdata->typ)) {
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &record->klass)) {
         return NULL;
     }
-    if (mrb_dns_codec_get_uint16be(mrb, getter, &rdata->klass)) {
+    if (mrb_dns_codec_get_uint32be(mrb, getter, &record->ttl)) {
         return NULL;
     }
-    if (mrb_dns_codec_get_uint32be(mrb, getter, &rdata->ttl)) {
+    if (mrb_dns_codec_get_uint16be(mrb, getter, &record->rlength)) {
         return NULL;
     }
-    if (mrb_dns_codec_get_uint16be(mrb, getter, &rdata->rlength)) {
+    record->rdata = (uint8_t *)mrb_dns_codec_get_str(mrb, getter, record->rlength);
+    return record;
+}
+
+mrb_dns_rdata_t *mrb_dns_codec_get_rdata(mrb_state *mrb, mrb_dns_get_state *getter) {
+    uint8_t flag           = 0;
+    mrb_dns_rdata_t *rdata = NULL;
+    if (mrb_dns_codec_get_uint8(mrb, getter, &flag)) {
         return NULL;
     }
-    rdata->rdata = (uint8_t *)mrb_dns_codec_get_str(mrb, getter, rdata->rlength);
+    rdata = (mrb_dns_rdata_t *)mrb_malloc(mrb, sizeof(mrb_dns_rdata_t));
+    if ((0xc0 & flag) == 0x40) {
+        rdata->data.opt = mrb_dns_codec_get_opt_rdata(mrb, getter);
+        rdata->typ       = 1;
+    } else {
+        getter->pos--;
+        rdata->data.record = mrb_dns_codec_get_record(mrb, getter);
+        rdata->typ          = 0;
+    }
     return rdata;
 }
 
