@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "mruby.h"
+#include "mruby/hash.h"
 
 #include "dns_codec.h"
 #include "dns_types.h"
@@ -291,6 +292,7 @@ mrb_dns_get_state *mrb_dns_codec_get_open(mrb_state *mrb, uint8_t *buff, size_t 
     state->buff = b;
     state->pos  = 0;
     state->end  = len;
+    state->nhash = mrb_hash_new(mrb);
     return state;
 }
 
@@ -482,6 +484,8 @@ mrb_dns_name_t *mrb_dns_codec_get_name_by_offset(mrb_state *mrb, mrb_dns_get_sta
 mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter) {
     mrb_dns_name_t *name = NULL;
     uint8_t len          = 0;
+    uint64_t saved_pos;
+    mrb_value argv[1], n;
 
     name       = (mrb_dns_name_t *)mrb_malloc(mrb, sizeof(mrb_dns_name_t));
     name->name = NULL;
@@ -503,6 +507,7 @@ mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter
             mrb_dns_name_append(mrb, name, n->name, n->len);
             return name;
         }
+        saved_pos = getter->pos;
         node = mrb_dns_codec_get_str(mrb, getter, len);
         if (!node) {
             mrb_free(mrb, name);
@@ -519,6 +524,9 @@ mrb_dns_name_t *mrb_dns_codec_get_name(mrb_state *mrb, mrb_dns_get_state *getter
         mrb_free(mrb, name);
         return NULL;
     }
+    argv[0] = mrb_str_new_cstr(mrb, name->name);
+    n = mrb_obj_new(mrb,  mrb_class_get_under(mrb, mrb_class_get_under(mrb, mrb_class_get(mrb, "Resolv"), "DNS"), "DomainName"), 1, argv);
+    mrb_hash_set(mrb, getter->nhash, mrb_fixnum_value(saved_pos), n );
     return name;
 }
 

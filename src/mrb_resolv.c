@@ -33,7 +33,7 @@ static mrb_value mrb_dns_codec_init(mrb_state *mrb, mrb_value self) { return sel
  **/
 
 static mrb_value mrb_dns_codec_decode(mrb_state *mrb, mrb_value self) {
-    mrb_value buff;
+    mrb_value buff, q;
     mrb_dns_get_state *getter = NULL;
     mrb_dns_pkt_t *pkt        = NULL;
     uint8_t *b                = NULL;
@@ -62,7 +62,9 @@ static mrb_value mrb_dns_codec_decode(mrb_state *mrb, mrb_value self) {
         return mrb_nil_value();
     }
 
-    return mrb_dns_ctype2query(mrb, pkt);
+    q = mrb_dns_ctype2query(mrb, pkt);
+    mrb_funcall(mrb, q, "nhash=", 1, getter->nhash);
+    return q;
 }
 
 

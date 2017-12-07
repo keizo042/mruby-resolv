@@ -131,15 +131,16 @@ class Resolv
     end
 
     class Query
-      attr_accessor :header, :questions, :answers, :authorities, :additionals
+      attr_accessor :header, :questions, :answers, :authorities, :additionals, :nhash
 
-      def initialize(hdr, q, an, ns, ar)
+      def initialize(hdr, q, an, ns, ar, hsh = {})
         ArgumentError unless hdr.is_a?(Header) || q.is_a?(Question) || an.is_a?(Answer) || ns.is_a?(Authority)
         @header = hdr
         @questions = q.nil? ? [] : q
         @answers = an.nil? ? [] : an
         @authorities = ns.nil? ? [] : ns
         @additionals = ar.nil? ? [] : ar
+        @nhash = hsh
       end
 
       def ==(rval)

@@ -37,6 +37,7 @@ typedef struct mrb_dns_get_s {
         uint8_t *buff;
         uint64_t pos;
         uint64_t end;
+        mrb_value nhash;
 }mrb_dns_get_state;
 
 mrb_dns_get_state *mrb_dns_codec_get_open(mrb_state *, uint8_t *, size_t len) ;
