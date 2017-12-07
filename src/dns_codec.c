@@ -14,6 +14,7 @@
 
 #include "dns_codec.h"
 #include "dns_types.h"
+#include "dns_rdata.h"
 
 /**
  * Put
@@ -199,6 +200,18 @@ int mrb_dns_codec_put_question(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dn
     return 0;
 }
 
+int mrb_dns_codec_put_rdata_resource(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_rdata_t *rdata){
+    switch(rdata->typ){
+        case 1:
+        case 2:
+        case 15:
+        case 255:
+        default:
+            return -1;
+    }
+    return 0;
+}
+
 int mrb_dns_codec_put_rdata(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_rdata_t *rdata) {
     uint8_t flag = 0;
     mrb_assert(rdata != NULL);
@@ -212,7 +225,7 @@ int mrb_dns_codec_put_rdata(mrb_state *mrb, mrb_dns_put_state *putter, mrb_dns_r
         return -1;
     if (mrb_dns_codec_put_uint16be(mrb, putter, rdata->rlength))
         return -1;
-    if (mrb_dns_codec_put_str(mrb, putter, (char *)rdata->rdata, rdata->rlength))
+    if (mrb_dns_codec_put_rdata_resource(mrb, putter, rdata))
         return -1;
     return 0;
 }
@@ -536,6 +549,37 @@ mrb_dns_question_t *mrb_dns_codec_get_question(mrb_state *mrb, mrb_dns_get_state
     return q;
 }
 
+static int mrb_dns_codec_get_rdata_resource(mrb_state *mrb, mrb_dns_get_state *getter, mrb_dns_rdata_t *rdata){
+    switch(rdata->typ){
+        case 1: // A
+            for(int i = 0; i < 4; i ++ ){
+                if(mrb_dns_codec_get_uint8(mrb, getter, &rdata->rdata.a.address[i])){
+                    return -1;
+                }
+            }
+            break;
+        case 2: // NS
+            
+            rdata->rdata.ns.nsdname = mrb_dns_codec_get_name(mrb, getter);
+            break;
+        case 15: // MX
+            if(mrb_dns_codec_get_uint16be(mrb, getter, &rdata->rdata.mx.preference))
+                return -1;
+            rdata->rdata.mx.exchange = mrb_dns_codec_get_name(mrb, getter);
+            break;
+        case 28: // AAAA
+            for(int i = 0; i < 8; i ++ ){
+                if(mrb_dns_codec_get_uint8(mrb, getter, &rdata->rdata.a.address[i])){
+                    return -1;
+                }
+            }
+            break;
+        default:
+                return -1;
+    }
+    return 0;
+}
+
 mrb_dns_rdata_t *mrb_dns_codec_get_rdata(mrb_state *mrb, mrb_dns_get_state *getter) {
     mrb_dns_rdata_t *rdata = (mrb_dns_rdata_t *)malloc(sizeof(mrb_dns_rdata_t));
 
@@ -554,7 +598,9 @@ mrb_dns_rdata_t *mrb_dns_codec_get_rdata(mrb_state *mrb, mrb_dns_get_state *gett
     if (mrb_dns_codec_get_uint16be(mrb, getter, &rdata->rlength)) {
         return NULL;
     }
-    rdata->rdata = (uint8_t *)mrb_dns_codec_get_str(mrb, getter, rdata->rlength);
+    if(mrb_dns_codec_get_rdata_resource(mrb, getter, rdata)){
+        return NULL;
+    }
     return rdata;
 }
 
